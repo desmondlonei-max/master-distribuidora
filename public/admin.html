@@ -278,7 +278,7 @@
             const url = id ? `${API_URL}/produtos/${id}` : `${API_URL}/produtos`;
 
             try {
-                const res = await fetch(url, {
+                const res = await apiFetch(url, {
                     method: metodo,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
