@@ -69,7 +69,7 @@ app.post('/admin/login', (req, res) => {
 app.get('/produtos', async (req, res) => {
     try {
         const connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial FROM produtos');
+        const [rows] = await connection.execute('SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial FROM produtos');
         await connection.end();
         res.json(rows);
     } catch (erro) {
@@ -91,14 +91,15 @@ app.get('/produtos-destaque', async (req, res) => {
 });
 
 app.post('/produtos', autenticarAdmin, async (req, res) => {
-    const { nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores } = req.body;
+    const { nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial } = req.body;
     const isDestaque = destaque ? 1 : 0;
+    const isGeloEspecial = eh_gelo_especial ? 1 : 0;
 
     try {
         const connection = await mysql.createConnection(dbConfig);
         const query = `
-            INSERT INTO produtos (nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO produtos (nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         await connection.execute(query, [
             nome, 
@@ -114,7 +115,9 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
             descricao, 
             status || 'disponivel', 
             isDestaque,
-            sabores || null
+            sabores || null,
+            isGeloEspecial,
+            preco_especial || 0
         ]);
         await connection.end();
         res.status(201).json({ sucesso: true, mensagem: 'Produto cadastrado com sucesso!' });
@@ -126,14 +129,15 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
 
 app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
     const { id } = req.params;
-    const { nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores } = req.body;
+    const { nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial } = req.body;
     const isDestaque = destaque ? 1 : 0;
+    const isGeloEspecial = eh_gelo_especial ? 1 : 0;
 
     try {
         const connection = await mysql.createConnection(dbConfig);
         const query = `
             UPDATE produtos 
-            SET nome = ?, categoria_id = ?, marca = ?, preco = ?, preco_atacado = ?, preco_custo = ?, volume = ?, teor_alcoolico = ?, estoque = ?, imagem = ?, descricao = ?, status = ?, destaque = ?, sabores = ?
+            SET nome = ?, categoria_id = ?, marca = ?, preco = ?, preco_atacado = ?, preco_custo = ?, volume = ?, teor_alcoolico = ?, estoque = ?, imagem = ?, descricao = ?, status = ?, destaque = ?, sabores = ?, eh_gelo_especial = ?, preco_especial = ?
             WHERE id = ?
         `;
         await connection.execute(query, [
@@ -151,6 +155,8 @@ app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
             status || 'disponivel', 
             isDestaque, 
             sabores || null,
+            isGeloEspecial,
+            preco_especial || 0,
             id
         ]);
         await connection.end();
@@ -215,7 +221,10 @@ app.post('/pedidos', async (req, res) => {
         const produtosDoPedido = [];
 
         for (let item of itens) {
-            const [rows] = await connection.execute('SELECT id, estoque, nome, preco, preco_atacado FROM produtos WHERE id = ?', [item.id]);
+            const [rows] = await connection.execute(
+                'SELECT id, estoque, nome, preco, preco_atacado, eh_gelo_especial, preco_especial FROM produtos WHERE id = ?', 
+                [item.id]
+            );
             if (rows.length === 0) throw new Error(`Produto ID ${item.id} não encontrado.`);
             
             const produtoDb = rows[0];
@@ -224,14 +233,20 @@ app.post('/pedidos', async (req, res) => {
                 throw new Error(`Estoque insuficiente para "${produtoDb.nome}". Disponível: ${produtoDb.estoque}`);
             }
 
-            const precoVarejo = Number(produtoDb.preco);
-            subtotalVarejo += precoVarejo * item.quantidade;
+            // Define o preço base do item (dando prioridade ao preço especial caso seja gelo especial)
+            let precoBaseItem = Number(produtoDb.preco);
+            if (produtoDb.eh_gelo_especial && produtoDb.preco_especial && Number(produtoDb.preco_especial) > 0) {
+                precoBaseItem = Number(produtoDb.preco_especial);
+            }
+
+            subtotalVarejo += precoBaseItem * item.quantidade;
 
             produtosDoPedido.push({
                 id: produtoDb.id,
                 quantidade: item.quantidade,
-                preco_varejo: precoVarejo,
-                preco_atacado: produtoDb.preco_atacado ? Number(produtoDb.preco_atacado) : 0
+                preco_base: precoBaseItem,
+                preco_atacado: produtoDb.preco_atacado ? Number(produtoDb.preco_atacado) : 0,
+                eh_gelo: produtoDb.eh_gelo_especial
             });
         }
 
@@ -240,9 +255,10 @@ app.post('/pedidos', async (req, res) => {
         const itensValidados = [];
 
         for (let prod of produtosDoPedido) {
-            let precoFinalItem = prod.preco_varejo;
+            let precoFinalItem = prod.preco_base;
 
-            if (atingiuAtacado && prod.preco_atacado > 0) {
+            // Se atingiu atacado e o produto tem preço de atacado válido E NÃO É gelo especial (gelo especial geralmente não acumula atacado, ajuste se necessário)
+            if (atingiuAtacado && prod.preco_atacado > 0 && !prod.eh_gelo) {
                 precoFinalItem = prod.preco_atacado;
             }
 
@@ -270,7 +286,7 @@ app.post('/pedidos', async (req, res) => {
 
         await connection.commit();
         await connection.end();
-        res.status(201).json({ sucesso: true, mensagem: 'Pedido realizado com sucesso!', chave_pix: 'adega.virtual@email.com' });
+        res.status(201).json({ sucesso: true, mensagem: 'Pedido realizado com sucesso!', chave_pix: 'masterdistribuidoracm@gmail.com' });
     } catch (erro) {
         await connection.rollback();
         await connection.end();
@@ -280,37 +296,29 @@ app.post('/pedidos', async (req, res) => {
 
 app.put('/pedidos/:id/status', autenticarAdmin, async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body; // Ex: 'pago', 'entregue', 'cancelado', etc.
+    const { status } = req.body; 
 
     const connection = await mysql.createConnection(dbConfig);
     try {
         await connection.beginTransaction();
 
-        // 1. Busca o status atual do pedido antes de alterar
         const [pedidoRows] = await connection.execute('SELECT status FROM pedidos WHERE id = ?', [id]);
         if (pedidoRows.length === 0) throw new Error('Pedido não encontrado.');
         const statusAnterior = pedidoRows[0].status;
 
-        // 2. Atualiza para o novo status no banco
         await connection.execute('UPDATE pedidos SET status = ? WHERE id = ?', [status, id]);
 
-        // 3. REGRA DE ESTOQUE BLINDADA:
-        
-        // Se o pedido virou 'pago' e ANTES NÃO ERA PAGO (baixa o estoque uma única vez)
         if (status === 'pago' && statusAnterior !== 'pago') {
             const [itens] = await connection.execute('SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id = ?', [id]);
             for (let item of itens) {
                 await connection.execute('UPDATE produtos SET estoque = estoque - ? WHERE id = ?', [item.quantidade, item.produto_id]);
             }
-        } 
-        // Se o pedido foi CANCELADO e ELE JÁ TINHA SIDO PAGO ANTES (devolve exatamente a quantidade para o estoque)
-        else if (status === 'cancelado' && statusAnterior === 'pago') {
+        } else if (status === 'cancelado' && statusAnterior === 'pago') {
             const [itens] = await connection.execute('SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id = ?', [id]);
             for (let item of itens) {
                 await connection.execute('UPDATE produtos SET estoque = estoque + ? WHERE id = ?', [item.quantidade, item.produto_id]);
             }
         }
-        // Se mudou para 'entregue', 'pendente' ou qualquer outro status, o estoque é ignorado.
 
         await connection.commit();
         await connection.end();
