@@ -10,29 +10,29 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-white text-zinc-900 font-sans antialiased overflow-x-hidden">
-
     <!-- Cabeçalho com Logo e Contatos Responsivo -->
     <header class="bg-white border-b border-zinc-200 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
             
-            <!-- Logo e Título -->
-<div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-    <div class="flex items-center gap-3">
-        <img src="/logo.png"
-             alt="Logo Distribuidora"
-             class="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-zinc-300 shadow-sm">
+            <!-- Logo, Título e Botão Mobile Alinhados -->
+            <div class="flex items-center justify-between w-full sm:w-auto gap-3">
+                <div class="flex items-center gap-3">
+                    <img src="/logo.png"
+                         alt="Logo Distribuidora"
+                         class="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-zinc-300 shadow-sm">
 
-        <h1 class="text-lg sm:text-xl md:text-2xl font-bold tracking-wider text-blue-600 truncate">
-            MASTER DISTRIBUIDORA
-        </h1>
-    </div>
-</div>
-                <!-- Botão do Carrinho Mobile visível apenas no topo -->
+                    <h1 class="text-lg sm:text-xl md:text-2xl font-bold tracking-wider text-blue-600 truncate">
+                        MASTER DISTRIBUIDORA
+                    </h1>
+                </div>
+
+                <!-- Botão do Carrinho Mobile (Fica na mesma linha da logo no celular) -->
                 <button onclick="abrirCarrinho()" class="sm:hidden relative bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center shadow-sm">
                     🛒
                     <span id="contador-carrinho-mobile" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">0</span>
                 </button>
             </div>
+
             <!-- Botão Carrinho Desktop -->
             <div class="hidden sm:flex items-center gap-4">
                 <button onclick="abrirCarrinho()" class="relative bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-sm">
@@ -40,6 +40,7 @@
                     <span id="contador-carrinho" class="bg-blue-50 text-blue-600 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
                 </button>
             </div>
+
         </div>
     </header>
 
