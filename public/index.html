@@ -6,448 +6,301 @@
     <title>Master Distribuidora de Bebidas</title>
     <link rel="icon" type="image/png" href="/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    boxShadow: {
-                        glow: '0 0 30px rgba(37, 99, 235, 0.12)',
-                    }
-                }
-            }
-        }
-    </script>
 </head>
+<body class="bg-white text-zinc-900 font-sans antialiased overflow-x-hidden">
 
-<body class="bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden">
+    <!-- CABEÇALHO -->
+    <header class="bg-white border-b border-zinc-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center justify-between w-full sm:w-auto gap-3">
+                <div class="flex items-center gap-3">
+                    <img src="/logo.png"
+                         alt="Logo Distribuidora"
+                         class="w-10 h-10 sm:w-12 sm:h-12 object-contain bg-white rounded-none border border-zinc-300 shadow-sm">
 
-    <!-- ==================== HEADER ==================== -->
-    <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-            <div class="flex items-center justify-between gap-4">
-
-                <!-- LOGO + NOME -->
-                <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden flex-shrink-0">
-                        <img src="/logo.png"
-                             alt="Logo Master Distribuidora"
-                             class="w-full h-full object-contain">
-                    </div>
-
-                    <div class="min-w-0">
-                        <h1 class="text-base sm:text-xl md:text-2xl font-black tracking-wide text-slate-900 truncate">
-                            MASTER <span class="text-blue-600">DISTRIBUIDORA</span>
-                        </h1>
-                        <p class="hidden sm:block text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold">
-                            Bebidas • Gelo • Conveniência
-                        </p>
-                    </div>
+                    <h1 class="text-lg sm:text-xl md:text-2xl font-bold tracking-wider text-blue-600 truncate">
+                        MASTER DISTRIBUIDORA
+                    </h1>
                 </div>
-
-                <!-- CARRINHO DESKTOP -->
-                <button onclick="abrirCarrinho()"
-                        class="hidden sm:flex relative items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all duration-200 shadow-lg shadow-blue-600/20 hover:-translate-y-0.5">
-                    <span class="text-lg">🛒</span>
-                    <span>Meu Carrinho</span>
-                    <span id="contador-carrinho"
-                          class="bg-white text-blue-600 min-w-6 h-6 px-2 rounded-full flex items-center justify-center text-xs font-black">
-                        0
-                    </span>
-                </button>
 
                 <!-- CARRINHO MOBILE -->
                 <button onclick="abrirCarrinho()"
-                        class="sm:hidden relative bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-blue-600/20">
-                    🛒
-                    <span>Carrinho</span>
+                        class="sm:hidden relative bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center shadow-sm">
+                    Carrinho
                     <span id="contador-carrinho-mobile"
-                          class="absolute -top-2 -right-2 bg-red-500 text-white min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[10px] font-black">
+                          class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
                         0
                     </span>
                 </button>
+            </div>
 
+            <!-- CARRINHO DESKTOP -->
+            <div class="hidden sm:flex items-center gap-4">
+                <button onclick="abrirCarrinho()"
+                        class="relative bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-sm">
+                    Carrinho
+                    <span id="contador-carrinho"
+                          class="bg-blue-50 text-blue-600 text-xs px-2 py-0.5 rounded-full font-bold">
+                        0
+                    </span>
+                </button>
             </div>
         </div>
     </header>
 
-    <!-- ==================== HERO ==================== -->
-    <section class="relative overflow-hidden bg-slate-950">
-        <div class="absolute inset-0 bg-gradient-to-br from-blue-950 via-slate-950 to-slate-900"></div>
-        <div class="absolute -top-32 -right-32 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl"></div>
-        <div class="absolute -bottom-40 -left-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+    <!-- BANNER PRINCIPAL -->
+    <section class="bg-white py-12 sm:py-16 border-b border-zinc-200">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <span class="inline-block text-blue-600 text-xs sm:text-sm font-bold uppercase tracking-widest mb-3">
+                Master Distribuidora
+            </span>
 
-        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24 md:py-28">
-            <div class="max-w-3xl">
+            <h2 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-zinc-900 mb-3 sm:mb-4">
+                As Melhores Bebidas na sua Porta
+            </h2>
 
-                <div class="inline-flex items-center gap-2 bg-white/10 border border-white/10 text-blue-300 rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider mb-6">
-                    <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
-                    Sua distribuidora de confiança
-                </div>
+            <p class="text-zinc-600 text-base sm:text-lg max-w-2xl mx-auto mb-6 sm:mb-8 px-2">
+                Cervejas geladas, whisky, energéticos e gelo com entrega rápida.
+            </p>
 
-                <h2 class="text-4xl sm:text-5xl md:text-6xl font-black text-white leading-tight tracking-tight">
-                    As melhores bebidas
-                    <span class="text-blue-500">na sua porta.</span>
-                </h2>
-
-                <p class="mt-5 text-slate-300 text-base sm:text-lg md:text-xl max-w-2xl leading-relaxed">
-                    Cervejas, bebidas, energéticos, whisky, gin, gelo e muito mais.
-                    Faça seu pedido de forma rápida e fácil.
-                </p>
-
-                <div class="flex flex-col sm:flex-row gap-3 mt-8">
-                    <a href="#produtos"
-                       class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black px-7 py-3.5 rounded-xl transition shadow-xl shadow-blue-600/20">
-                        Ver catálogo
-                        <span>→</span>
-                    </a>
-
-                    <button onclick="abrirCarrinho()"
-                            class="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold px-7 py-3.5 rounded-xl transition">
-                        🛒 Abrir carrinho
-                    </button>
-                </div>
-
-                <div class="flex flex-wrap gap-x-6 gap-y-3 mt-8 text-xs sm:text-sm text-slate-400">
-                    <span>✓ Produtos selecionados</span>
-                    <span>✓ Pedido online</span>
-                    <span>✓ Pagamento via PIX</span>
-                </div>
-            </div>
+            <a href="#produtos"
+               class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 sm:px-8 py-3 rounded-xl transition shadow-lg shadow-blue-500/20 text-sm sm:text-base">
+                Ver Catálogo
+            </a>
         </div>
     </section>
 
-    <!-- ==================== BENEFÍCIOS ==================== -->
-    <section class="bg-white border-b border-slate-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <!-- PROMOÇÕES -->
+    <section id="promocoes" class="bg-zinc-50 py-10 sm:py-12 border-b border-zinc-200">
+        <div class="max-w-7xl mx-auto px-4">
 
-                <div class="flex items-center gap-3 p-3 rounded-xl">
-                    <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg flex-shrink-0">
-                        🚚
-                    </div>
-                    <div>
-                        <p class="font-bold text-sm">Entrega rápida</p>
-                        <p class="text-[11px] text-slate-500">Receba seu pedido</p>
-                    </div>
-                </div>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
+                <h3 class="text-xl sm:text-2xl font-bold border-l-4 border-blue-500 pl-3">
+                    Ofertas Especiais da Semana
+                </h3>
 
-                <div class="flex items-center gap-3 p-3 rounded-xl">
-                    <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg flex-shrink-0">
-                        🥤
-                    </div>
-                    <div>
-                        <p class="font-bold text-sm">Grande variedade</p>
-                        <p class="text-[11px] text-slate-500">Diversas opções</p>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-3 p-3 rounded-xl">
-                    <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg flex-shrink-0">
-                        💰
-                    </div>
-                    <div>
-                        <p class="font-bold text-sm">Preço de atacado</p>
-                        <p class="text-[11px] text-slate-500">Economize mais</p>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-3 p-3 rounded-xl">
-                    <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg flex-shrink-0">
-                        ⚡
-                    </div>
-                    <div>
-                        <p class="font-bold text-sm">Pedido fácil</p>
-                        <p class="text-[11px] text-slate-500">Tudo pelo site</p>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </section>
-
-    <!-- ==================== PROMOÇÕES ==================== -->
-    <section id="promocoes" class="py-12 sm:py-16 bg-slate-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6">
-
-            <div class="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-8">
-                <div>
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="w-8 h-1 bg-blue-600 rounded-full"></span>
-                        <span class="text-blue-600 text-xs font-black uppercase tracking-widest">
-                            Não perca
-                        </span>
-                    </div>
-
-                    <h3 class="text-2xl sm:text-3xl font-black text-slate-900">
-                        Ofertas especiais
-                    </h3>
-
-                    <p class="text-sm text-slate-500 mt-1">
-                        Aproveite nossas promoções por tempo limitado.
-                    </p>
-                </div>
-
-                <span class="self-start sm:self-auto bg-red-50 text-red-600 border border-red-100 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider">
-                    🔥 Tempo limitado
+                <span class="text-[11px] sm:text-xs uppercase font-bold tracking-wider bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+                    Tempo Limitado
                 </span>
             </div>
 
-            <div id="lista-promocoes" class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div class="bg-white border border-slate-200 rounded-2xl p-6">
-                    <p class="text-slate-400 text-sm">Carregando ofertas...</p>
-                </div>
-            </div>
-
-        </div>
-    </section>
-
-    <!-- ==================== PRODUTOS ==================== -->
-    <main id="produtos" class="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-
-        <div class="flex flex-col sm:flex-row justify-between sm:items-end gap-3 mb-8">
-            <div>
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="w-8 h-1 bg-blue-600 rounded-full"></span>
-                    <span class="text-blue-600 text-xs font-black uppercase tracking-widest">
-                        Catálogo
-                    </span>
-                </div>
-
-                <h3 class="text-2xl sm:text-3xl font-black text-slate-900">
-                    Nossos produtos
-                </h3>
-
-                <p class="text-sm text-slate-500 mt-1">
-                    Escolha seus produtos e adicione ao carrinho.
+            <div id="lista-promocoes" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <p class="text-zinc-500 col-span-full">
+                    Carregando ofertas...
                 </p>
             </div>
         </div>
+    </section>
+
+    <!-- PRODUTOS -->
+    <main id="produtos" class="max-w-7xl mx-auto px-4 py-10 sm:py-12">
+        <h3 class="text-xl sm:text-2xl font-bold mb-6 border-l-4 border-blue-500 pl-3">
+            Nossos Produtos
+        </h3>
 
         <div id="lista-produtos"
-             class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            <div class="bg-white border border-slate-200 rounded-2xl p-5">
-                <p class="text-slate-400 text-sm">Carregando produtos...</p>
-            </div>
+             class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <p class="text-zinc-500 col-span-full">
+                Carregando produtos...
+            </p>
         </div>
-
     </main>
 
-    <!-- ==================== CARRINHO ==================== -->
+    <!-- MODAL DO CARRINHO -->
     <div id="modal-carrinho"
-         class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[60] hidden flex justify-end">
+         class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex justify-end">
 
-        <div class="bg-white w-full sm:max-w-md h-full flex flex-col shadow-2xl">
+        <div class="bg-white w-full sm:max-w-md h-full p-4 sm:p-6 flex flex-col justify-between border-l border-zinc-200 overflow-y-auto">
 
-            <!-- TOPO -->
-            <div class="px-5 sm:px-6 py-5 border-b border-slate-200 flex items-center justify-between bg-white">
-                <div>
-                    <p class="text-[10px] uppercase tracking-widest text-blue-600 font-black">
-                        Seu pedido
-                    </p>
-                    <h3 class="text-xl font-black text-slate-900">
-                        🛒 Carrinho
+            <div>
+                <div class="flex justify-between items-center mb-6 pb-4 border-b border-zinc-200">
+                    <h3 class="text-lg sm:text-xl font-bold text-blue-600">
+                        Seu Carrinho
                     </h3>
+
+                    <button onclick="fecharCarrinho()"
+                            class="text-zinc-500 hover:text-zinc-900 text-2xl font-bold px-2">
+                        &times;
+                    </button>
                 </div>
 
-                <button onclick="fecharCarrinho()"
-                        class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 text-2xl font-bold transition">
-                    &times;
-                </button>
-            </div>
-
-            <!-- ITENS -->
-            <div class="flex-1 overflow-y-auto px-5 sm:px-6 py-5">
-                <div id="itens-carrinho" class="space-y-3">
-                    <p class="text-slate-400 text-center py-10 text-sm">
+                <div id="itens-carrinho" class="space-y-3 mb-6">
+                    <p class="text-zinc-500 text-center py-8">
                         Seu carrinho está vazio.
                     </p>
                 </div>
             </div>
 
-            <!-- RODAPÉ -->
-            <div class="border-t border-slate-200 p-5 sm:p-6 bg-slate-50">
+            <!-- CHECKOUT -->
+            <div class="border-t border-zinc-200 pt-4 space-y-4">
 
-                <div class="flex justify-between items-center mb-4">
-                    <span class="text-sm font-semibold text-slate-500">
-                        Total do pedido
-                    </span>
-
-                    <span id="total-carrinho"
-                          class="text-2xl font-black text-blue-600">
+                <div class="flex justify-between items-center text-lg font-bold">
+                    <span>Total:</span>
+                    <span id="total-carrinho" class="text-blue-600">
                         R$ 0,00
                     </span>
                 </div>
 
                 <form id="form-checkout" class="space-y-3 hidden">
 
-                    <div class="border-t border-slate-200 pt-4">
-                        <p class="text-xs uppercase tracking-wider text-blue-600 font-black mb-3">
-                            Dados de entrega
-                        </p>
-                    </div>
+                    <h4 class="text-sm font-semibold text-blue-600 uppercase tracking-wider pt-2">
+                        Dados de Entrega
+                    </h4>
 
                     <input type="text"
                            id="nome-cliente"
                            required
-                           placeholder="Seu nome completo"
-                           class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                           placeholder="Seu Nome Completo"
+                           class="w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-blue-500">
 
                     <input type="text"
                            id="telefone"
                            required
                            placeholder="Telefone / WhatsApp"
-                           class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                           class="w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-blue-500">
 
                     <textarea id="endereco"
                               required
-                              rows="3"
-                              placeholder="Endereço completo (Rua, Número, Bairro, Cidade)"
-                              class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+                              rows="2"
+                              placeholder="Endereço Completo (Rua, Número, Bairro, Cidade)"
+                              class="w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-blue-500"></textarea>
 
-                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
-                        <span class="font-black">💳 Pagamento:</span>
-                        PIX — a chave será exibida após finalizar.
+                    <div class="bg-zinc-50 p-3 rounded-lg border border-zinc-200 text-xs text-zinc-600">
+                        Forma de pagamento:
+                        <strong class="text-blue-600">PIX</strong>
+                        <br>
+                        A chave será informada após a finalização.
                     </div>
 
                     <button type="submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition shadow-lg shadow-blue-600/20">
-                        Finalizar pedido via PIX
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition text-sm">
+                        Finalizar Pedido via PIX
                     </button>
                 </form>
 
                 <button id="btn-ir-checkout"
                         onclick="mostrarFormularioCheckout()"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition shadow-lg shadow-blue-600/20">
-                    Continuar para entrega
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition text-sm">
+                    Continuar para Entrega
                 </button>
-
             </div>
         </div>
     </div>
 
-    <!-- ==================== MODAL PIX ==================== -->
+    <!-- MODAL PIX -->
     <div id="modal-pix"
-         class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[70] hidden flex items-center justify-center p-4">
+         class="fixed inset-0 bg-black/50 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
 
-        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="bg-white border border-zinc-200 rounded-2xl max-w-md w-full p-5 sm:p-6 text-center space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
 
-            <div class="w-16 h-16 bg-emerald-50 border border-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 text-2xl font-black mb-5">
+            <div class="w-14 h-14 sm:w-16 sm:h-16 bg-blue-50 border border-blue-200 rounded-full flex items-center justify-center mx-auto text-blue-600 text-xl sm:text-2xl font-bold">
                 ✓
             </div>
 
-            <p class="text-emerald-600 text-xs font-black uppercase tracking-widest mb-2">
-                Tudo certo!
-            </p>
-
-            <h3 class="text-2xl sm:text-3xl font-black text-slate-900">
-                Pedido realizado!
+            <h3 class="text-xl sm:text-2xl font-bold text-zinc-900">
+                Pedido Realizado com Sucesso!
             </h3>
 
-            <p class="text-slate-500 text-sm mt-2 leading-relaxed">
-                Agora faça o pagamento via PIX utilizando a chave abaixo.
+            <p class="text-zinc-600 text-xs sm:text-sm">
+                Faça o pagamento via PIX utilizando a chave abaixo:
             </p>
 
-            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-6 text-left">
-                <span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold block mb-1">
+            <div class="bg-zinc-50 p-3.5 sm:p-4 rounded-xl border border-zinc-200 text-left space-y-1">
+                <span class="text-[11px] text-zinc-500 block">
                     Chave PIX
                 </span>
 
                 <span id="chave-pix-texto"
-                      class="text-blue-600 font-mono font-black text-sm break-all">
+                      class="text-blue-600 font-mono font-bold text-xs sm:text-sm break-all">
                     masterdistribuidoracm@gmail.com
                 </span>
             </div>
 
-            <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 mt-4 text-left">
-                <p class="text-xs font-black text-blue-800 mb-2">
-                    ⚠️ IMPORTANTE
+            <!-- AVISO -->
+            <div class="bg-blue-50 border border-blue-200 p-3 rounded-xl text-left text-xs text-blue-800 space-y-1">
+
+                <p class="font-bold">
+                    IMPORTANTE
                 </p>
 
-                <p class="text-xs text-blue-700 leading-relaxed">
-                    Para confirmar e liberar seu pedido, envie o comprovante do PIX pelo nosso WhatsApp:
+                <p>
+                    Para confirmar e liberar o seu pedido, envie o comprovante do PIX para o nosso WhatsApp:
                 </p>
 
-                <p class="font-mono font-black text-blue-600 text-sm mt-2">
-                    📲 (86) 9987-8778
+                <p class="font-mono font-bold text-blue-600 text-xs sm:text-sm pt-1">
+                    (86) 9987-8778
                 </p>
             </div>
 
-            <div class="space-y-3 mt-5">
+            <div class="space-y-2 pt-2">
 
                 <a id="btn-whatsapp"
                    href="https://wa.me/558699878778?text=Olá!%20Acabei%20de%20fazer%20um%20pedido%20na%20Master%20Distribuidora.%20Segue%20o%20comprovante%20do%20PIX:"
                    target="_blank"
-                   class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-xl transition flex items-center justify-center gap-2">
-                    💬 Enviar comprovante no WhatsApp
+                   class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition text-xs sm:text-sm flex items-center justify-center gap-2">
+
+                    <!-- ÍCONE WHATSAPP -->
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M20.5 3.5A11.9 11.9 0 0 0 12.05 0C5.5 0 .17 5.32.17 11.87c0 2.09.55 4.13 1.59 5.92L.07 24l6.35-1.66a11.9 11.9 0 0 0 5.62 1.43h.01c6.54 0 11.87-5.32 11.87-11.87 0-3.18-1.24-6.17-3.42-8.4zM12.05 21.7a9.82 9.82 0 0 1-5.01-1.37l-.36-.21-3.77.99 1.01-3.68-.23-.38a9.83 9.83 0 1 1 8.36 4.65zm5.39-7.37c-.3-.15-1.78-.88-2.05-.98-.27-.1-.47-.15-.67.15-.2.3-.77.98-.94 1.18-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.46-.89-.79-1.49-1.77-1.67-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.49s1.07 2.89 1.22 3.09c.15.2 2.1 3.21 5.09 4.5.71.31 1.26.49 1.69.63.71.23 1.35.2 1.86.12.57-.09 1.78-.73 2.03-1.43.25-.7.25-1.3.17-1.43-.07-.12-.27-.2-.57-.35z"/>
+                    </svg>
+
+                    Enviar Comprovante no WhatsApp
                 </a>
 
                 <button onclick="fecharTudoESair()"
-                        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition">
+                        class="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-2.5 rounded-xl transition text-xs sm:text-sm">
                     Concluir / Fechar
                 </button>
-
             </div>
         </div>
     </div>
 
-    <!-- ==================== FOOTER ==================== -->
-    <footer class="bg-slate-950 text-slate-400 border-t border-slate-800">
+    <!-- RODAPÉ -->
+    <footer class="bg-white border-t border-zinc-200 py-8 text-center text-zinc-500 text-xs sm:text-sm space-y-4 px-4">
 
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-
-            <div class="flex flex-col md:flex-row justify-between items-center md:items-start gap-8">
-
-                <div class="text-center md:text-left">
-                    <div class="flex items-center justify-center md:justify-start gap-3 mb-3">
-                        <div class="w-12 h-12 bg-white rounded-xl overflow-hidden flex items-center justify-center">
-                            <img src="/logo.png"
-                                 alt="Logo Master Distribuidora"
-                                 class="w-full h-full object-contain">
-                        </div>
-
-                        <div>
-                            <p class="font-black text-white tracking-wide">
-                                MASTER <span class="text-blue-500">DISTRIBUIDORA</span>
-                            </p>
-                            <p class="text-[10px] uppercase tracking-widest text-slate-500">
-                                Bebidas e conveniência
-                            </p>
-                        </div>
-                    </div>
-
-                    <p class="text-xs max-w-sm leading-relaxed">
-                        Sua distribuidora de bebidas com praticidade, variedade e atendimento rápido.
-                    </p>
-                </div>
-
-                <div class="flex flex-col sm:flex-row gap-3">
-
-                    <a href="https://instagram.com/masterdistribuidoracm"
-                       target="_blank"
-                       class="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                        📸 Instagram
-                    </a>
-
-                    <a href="https://wa.me/558699878778"
-                       target="_blank"
-                       class="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold transition">
-                        💬 WhatsApp
-                    </a>
-
-                </div>
-            </div>
-
-            <div class="border-t border-slate-800 mt-10 pt-6 text-center">
-                <p class="text-[11px] sm:text-xs">
-                    © 2026 Master Distribuidora. Proibida a venda de bebidas alcoólicas para menores de 18 anos.
-                </p>
-            </div>
-
+        <div class="flex justify-center">
+            <img src="/logo.png"
+                 alt="Logo Master Distribuidora"
+                 class="w-16 h-16 sm:w-20 sm:h-20 object-contain bg-white rounded-none border border-zinc-200 shadow-sm p-1">
         </div>
+
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-6 font-medium text-zinc-600">
+
+            <!-- INSTAGRAM -->
+            <a href="https://instagram.com/masterdistribuidoracm"
+               target="_blank"
+               class="hover:text-pink-600 transition flex items-center gap-2">
+
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7.8 2h8.4A5.8 5.8 0 0 1 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8A5.8 5.8 0 0 1 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2zm-.2 2A3.8 3.8 0 0 0 4 7.8v8.4A3.8 3.8 0 0 0 7.8 20h8.4a3.8 3.8 0 0 0 3.8-3.8V7.8A3.8 3.8 0 0 0 16.2 4H7.6zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm5.25-3.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z"/>
+                </svg>
+
+                <span>
+                    @masterdistribuidoracm
+                </span>
+            </a>
+
+            <!-- WHATSAPP -->
+            <a href="https://wa.me/558699878778"
+               target="_blank"
+               class="hover:text-emerald-600 transition flex items-center gap-2">
+
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.5 3.5A11.9 11.9 0 0 0 12.05 0C5.5 0 .17 5.32.17 11.87c0 2.09.55 4.13 1.59 5.92L.07 24l6.35-1.66a11.9 11.9 0 0 0 5.62 1.43h.01c6.54 0 11.87-5.32 11.87-11.87 0-3.18-1.24-6.17-3.42-8.4zM12.05 21.7a9.82 9.82 0 0 1-5.01-1.37l-.36-.21-3.77.99 1.01-3.68-.23-.38a9.83 9.83 0 1 1 8.36 4.65zm5.39-7.37c-.3-.15-1.78-.88-2.05-.98-.27-.1-.47-.15-.67.15-.2.3-.77.98-.94 1.18-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.46-.89-.79-1.49-1.77-1.67-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.49s1.07 2.89 1.22 3.09c.15.2 2.1 3.21 5.09 4.5.71.31 1.26.49 1.69.63.71.23 1.35.2 1.86.12.57-.09 1.78-.73 2.03-1.43.25-.7.25-1.3.17-1.43-.07-.12-.27-.2-.57-.35z"/>
+                </svg>
+
+                <span>
+                    (86) 9987-8778
+                </span>
+            </a>
+        </div>
+
+        <p>
+            &copy; 2026 Master Distribuidora. Proibida a venda de bebidas alcoólicas para menores de 18 anos.
+        </p>
     </footer>
 
-    <!-- ==================== JAVASCRIPT ==================== -->
+    <!-- JAVASCRIPT -->
     <script>
         let carrinho = [];
         let produtosLoja = [];
@@ -464,18 +317,18 @@
 
             if (listaSabores.length === 0) return '';
 
-            let optionsHtml = listaSabores.map(sabor =>
-                `<option value="${sabor}">${sabor}</option>`
-            ).join('');
+            let optionsHtml = listaSabores
+                .map(sabor => `<option value="${sabor}">${sabor}</option>`)
+                .join('');
 
             return `
-                <div class="mt-3">
-                    <label class="text-[10px] uppercase tracking-wider font-black text-slate-500 block mb-1.5">
-                        Escolha o sabor
+                <div class="mt-2.5">
+                    <label class="text-[11px] font-bold text-zinc-700 block mb-1">
+                        Escolha o Sabor:
                     </label>
 
                     <select id="sabor-${produto.id}"
-                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-semibold">
+                            class="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-1.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-500 font-medium">
                         ${optionsHtml}
                     </select>
                 </div>
@@ -492,80 +345,72 @@
 
                 if (!promocoesLoja || promocoesLoja.length === 0) {
                     container.innerHTML = `
-                        <div class="bg-white border border-slate-200 rounded-2xl p-6 col-span-full">
-                            <p class="text-slate-400 text-sm">
-                                Nenhuma oferta em destaque no momento.
-                            </p>
-                        </div>
+                        <p class="text-zinc-500 col-span-full">
+                            Nenhuma oferta em destaque no momento.
+                        </p>
                     `;
                     return;
                 }
 
                 promocoesLoja.forEach((promo, index) => {
 
-                    const descricaoTexto = promo.descricao ||
-                        'Aproveite essa super oferta por tempo limitado.';
-
                     const estiloCard = index % 2 === 0
-                        ? 'bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900'
-                        : 'bg-gradient-to-br from-slate-800 via-slate-900 to-black';
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
+                        : 'bg-gradient-to-r from-zinc-900 to-zinc-800 text-white';
 
                     const botaoEstilo = index % 2 === 0
-                        ? 'bg-white text-blue-700 hover:bg-blue-50'
-                        : 'bg-blue-600 text-white hover:bg-blue-500';
+                        ? 'bg-white text-blue-600 hover:bg-blue-50'
+                        : 'bg-blue-600 text-white hover:bg-blue-700';
+
+                    const descricaoTexto = promo.descricao || 'Aproveite essa super oferta por tempo limitado.';
 
                     container.innerHTML += `
-                        <div class="${estiloCard} rounded-2xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden group">
+                        <div class="${estiloCard} rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-md relative overflow-hidden">
 
-                            <div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10"></div>
-                            <div class="absolute -right-14 -bottom-14 w-44 h-44 rounded-full bg-white/5"></div>
+                            <div class="absolute -right-4 -bottom-4 text-white/10 text-8xl font-black select-none">
+                                OFERTA
+                            </div>
 
                             <div class="relative z-10">
 
-                                <div class="flex items-center justify-between gap-3">
-                                    <span class="bg-white/15 border border-white/10 text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider">
-                                        🔥 Destaque
-                                    </span>
+                                <span class="bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-md uppercase">
+                                    Destaque
+                                </span>
 
-                                    <span class="text-white/50 text-[10px] font-bold uppercase">
-                                        Oferta
-                                    </span>
-                                </div>
-
-                                <h4 class="text-xl sm:text-2xl font-black mt-5">
+                                <h4 class="text-xl sm:text-2xl font-extrabold mt-3 mb-1">
                                     ${promo.nome}
                                 </h4>
 
-                                <div class="relative group inline-block w-full mt-2">
-                                    <p class="text-blue-100 text-xs sm:text-sm line-clamp-2 cursor-help leading-relaxed">
+                                <div class="relative group inline-block w-full">
+
+                                    <p class="text-zinc-100 text-xs sm:text-sm mb-2 line-clamp-2 cursor-help">
                                         ${descricaoTexto}
                                     </p>
 
-                                    <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-64 p-3 bg-slate-950 text-white text-xs rounded-xl shadow-xl border border-slate-700 z-30 pointer-events-none leading-relaxed">
+                                    <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-64 p-3 bg-zinc-900 text-white text-xs rounded-xl shadow-xl border border-zinc-700 z-30 pointer-events-none leading-relaxed">
                                         ${descricaoTexto}
                                     </div>
                                 </div>
 
                                 ${gerarHtmlSabores(promo)}
+                            </div>
 
-                                <div class="flex items-end justify-between gap-4 pt-5 mt-5 border-t border-white/15">
+                            <div class="relative z-10 flex items-center justify-between pt-4 mt-2 border-t border-white/20">
 
-                                    <div>
-                                        <span class="text-[10px] uppercase tracking-wider text-blue-200 block font-bold">
-                                            Preço promocional
-                                        </span>
+                                <div>
+                                    <span class="text-[11px] text-zinc-200 block">
+                                        Preço Promocional
+                                    </span>
 
-                                        <span class="text-2xl sm:text-3xl font-black">
-                                            R$ ${Number(promo.preco).toFixed(2)}
-                                        </span>
-                                    </div>
-
-                                    <button onclick="adicionarPromocaoAoCarrinho(${promo.id})"
-                                            class="${botaoEstilo} font-black px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all hover:-translate-y-0.5 shadow-lg">
-                                        Adicionar
-                                    </button>
+                                    <span class="text-xl sm:text-2xl font-bold">
+                                        R$ ${Number(promo.preco).toFixed(2)}
+                                    </span>
                                 </div>
 
+                                <button onclick="adicionarPromocaoAoCarrinho(${promo.id})"
+                                        class="${botaoEstilo} font-bold px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm transition">
+                                    Adicionar
+                                </button>
                             </div>
                         </div>
                     `;
@@ -575,11 +420,9 @@
                 console.error('Erro ao carregar promoções:', erro);
 
                 document.getElementById('lista-promocoes').innerHTML = `
-                    <div class="bg-white border border-red-100 rounded-2xl p-6 col-span-full">
-                        <p class="text-red-500 text-sm">
-                            Erro ao carregar ofertas em destaque.
-                        </p>
-                    </div>
+                    <p class="text-zinc-500 col-span-full">
+                        Erro ao carregar ofertas em destaque.
+                    </p>
                 `;
             }
         }
@@ -597,11 +440,9 @@
 
                 if (produtosLoja.length === 0) {
                     container.innerHTML = `
-                        <div class="bg-white border border-slate-200 rounded-2xl p-6 col-span-full">
-                            <p class="text-slate-400 text-sm">
-                                Nenhum produto cadastrado no momento.
-                            </p>
-                        </div>
+                        <p class="text-zinc-500 col-span-full">
+                            Nenhum produto cadastrado no momento.
+                        </p>
                     `;
                     return;
                 }
@@ -609,11 +450,8 @@
                 produtosLoja.forEach(produto => {
 
                     const imagemHtml = produto.imagem
-                        ? `<img src="${produto.imagem}" alt="${produto.nome}" class="w-full h-full object-contain transition duration-300 group-hover:scale-105">`
-                        : `<div class="flex flex-col items-center justify-center gap-2 text-slate-300">
-                               <span class="text-4xl">🥤</span>
-                               <span class="font-semibold text-xs">Sem Foto</span>
-                           </div>`;
+                        ? `<img src="${produto.imagem}" alt="${produto.nome}" class="w-full h-full object-contain">`
+                        : `<span class="text-zinc-400 font-semibold text-xs">Sem Foto</span>`;
 
                     const precoVarejo = Number(produto.preco || 0).toFixed(2);
                     const precoAtacado = Number(produto.preco_atacado || 0).toFixed(2);
@@ -624,13 +462,14 @@
                     if (produto.eh_gelo_especial == 1 || produto.eh_gelo_especial === true) {
 
                         blocoAtacado = `
-                            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 mt-3">
-                                <span class="text-[10px] font-black text-blue-700 uppercase block mb-1">
-                                    🧊 Gelo especial
+                            <div class="bg-blue-50 border border-blue-100 rounded-lg p-2 mt-2 flex flex-col justify-between gap-0.5">
+
+                                <span class="text-[10px] sm:text-xs font-bold text-blue-700 uppercase">
+                                    Gelo Especial — Preço Dinâmico
                                 </span>
 
-                                <span class="text-[11px] text-blue-800 font-semibold leading-relaxed">
-                                    Até 5un: R$ 4,00 un | 6un: R$ 20,00 | +10un: R$ 2,50 un
+                                <span class="text-xs text-blue-800 font-medium">
+                                    Até 5 un: R$ 4,00 un | 6 un: R$ 20,00 | +10 un: R$ 2,50 un
                                 </span>
                             </div>
                         `;
@@ -638,12 +477,13 @@
                     } else if (Number(produto.preco_atacado) > 0) {
 
                         blocoAtacado = `
-                            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 mt-3 flex flex-col gap-1">
-                                <span class="text-[10px] font-black text-blue-700 uppercase">
-                                    📦 Atacado a partir de R$ 250
+                            <div class="bg-blue-50 border border-blue-100 rounded-lg p-2 mt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-0.5 sm:gap-0">
+
+                                <span class="text-[10px] sm:text-xs font-bold text-blue-700 uppercase">
+                                    Atacado (a partir de R$ 250)
                                 </span>
 
-                                <span class="text-sm font-black text-blue-800">
+                                <span class="text-xs sm:text-sm font-black text-blue-800">
                                     R$ ${precoAtacado}
                                 </span>
                             </div>
@@ -651,65 +491,54 @@
                     }
 
                     container.innerHTML += `
-                        <div class="group bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-blue-300 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300">
+                        <div class="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col justify-between hover:border-blue-500/50 transition shadow-sm">
 
-                            <div class="p-4">
+                            <div>
 
-                                <div class="h-56 sm:h-60 bg-slate-50 rounded-xl mb-4 flex items-center justify-center overflow-hidden p-3 border border-slate-100">
+                                <div class="h-64 sm:h-72 bg-zinc-50 rounded-lg mb-4 flex items-center justify-center overflow-hidden p-2">
                                     ${imagemHtml}
                                 </div>
 
-                                <span class="text-[10px] text-blue-600 uppercase font-black tracking-widest">
+                                <span class="text-[11px] text-blue-600 uppercase font-bold tracking-wider">
                                     ${produto.marca || 'Master'}
                                 </span>
 
-                                <h4 class="text-base sm:text-lg font-black text-slate-900 mt-1 leading-snug">
+                                <h4 class="text-base sm:text-lg font-semibold text-zinc-900 mt-1 leading-snug">
                                     ${produto.nome}
                                 </h4>
 
-                                <div class="relative group inline-block w-full mt-2">
+                                <div class="relative group inline-block w-full mt-1">
 
-                                    <p class="text-slate-500 text-xs sm:text-sm line-clamp-2 cursor-help leading-relaxed">
+                                    <p class="text-zinc-600 text-xs sm:text-sm line-clamp-2 cursor-help">
                                         ${descricaoTexto}
                                     </p>
 
-                                    <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-64 p-3 bg-slate-950 text-white text-xs rounded-xl shadow-xl border border-slate-700 z-30 pointer-events-none leading-relaxed">
+                                    <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-64 p-3 bg-zinc-900 text-white text-xs rounded-xl shadow-xl border border-zinc-700 z-30 pointer-events-none leading-relaxed">
                                         ${descricaoTexto}
                                     </div>
-
                                 </div>
 
                                 ${gerarHtmlSabores(produto)}
-
                             </div>
 
-                            <div class="px-4 pb-4">
+                            <div class="mt-4 pt-4 border-t border-zinc-200">
 
-                                <div class="border-t border-slate-100 pt-4">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-zinc-500 font-medium">
+                                        Varejo (Padrão):
+                                    </span>
 
-                                    <div class="flex justify-between items-center">
-
-                                        <div>
-                                            <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">
-                                                Varejo
-                                            </span>
-
-                                            <span class="text-xl font-black text-slate-900">
-                                                R$ ${precoVarejo}
-                                            </span>
-                                        </div>
-
-                                    </div>
-
-                                    ${blocoAtacado}
-
-                                    <button onclick="adicionarAoCarrinho(${produto.id})"
-                                            class="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-blue-600/10 hover:shadow-lg hover:-translate-y-0.5">
-                                        🛒 Adicionar ao carrinho
-                                    </button>
-
+                                    <span class="text-base sm:text-lg font-bold text-zinc-900">
+                                        R$ ${precoVarejo}
+                                    </span>
                                 </div>
 
+                                ${blocoAtacado}
+
+                                <button onclick="adicionarAoCarrinho(${produto.id})"
+                                        class="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-xs sm:text-sm transition shadow-sm">
+                                    Adicionar ao Carrinho
+                                </button>
                             </div>
                         </div>
                     `;
@@ -719,11 +548,9 @@
                 console.error('Erro ao carregar produtos:', erro);
 
                 document.getElementById('lista-produtos').innerHTML = `
-                    <div class="bg-red-50 border border-red-100 rounded-2xl p-6 col-span-full">
-                        <p class="text-red-500 font-semibold text-sm">
-                            Erro ao conectar com o servidor.
-                        </p>
-                    </div>
+                    <p class="text-red-500 col-span-full">
+                        Erro ao conectar com o servidor.
+                    </p>
                 `;
             }
         }
@@ -734,12 +561,16 @@
         }
 
         function adicionarPromocaoAoCarrinho(id) {
+
             const produto = promocoesLoja.find(p => p.id === id);
             if (!produto) return;
 
             const selectSabor = document.getElementById(`sabor-${id}`);
             const saborEscolhido = selectSabor ? selectSabor.value : '';
-            const itemKey = saborEscolhido ? `${id}-${saborEscolhido}` : String(id);
+
+            const itemKey = saborEscolhido
+                ? `${id}-${saborEscolhido}`
+                : String(id);
 
             const itemExistente = carrinho.find(item => item.itemKey === itemKey);
             const quantidadeAtual = itemExistente ? itemExistente.quantidade : 0;
@@ -765,12 +596,16 @@
         }
 
         function adicionarAoCarrinho(id) {
+
             const produto = produtosLoja.find(p => p.id === id);
             if (!produto) return;
 
             const selectSabor = document.getElementById(`sabor-${id}`);
             const saborEscolhido = selectSabor ? selectSabor.value : '';
-            const itemKey = saborEscolhido ? `${id}-${saborEscolhido}` : String(id);
+
+            const itemKey = saborEscolhido
+                ? `${id}-${saborEscolhido}`
+                : String(id);
 
             const itemExistente = carrinho.find(item => item.itemKey === itemKey);
             const quantidadeAtual = itemExistente ? itemExistente.quantidade : 0;
@@ -796,20 +631,23 @@
         }
 
         function calcularPrecoEfetivoItem(item, subtotalVarejoGeral) {
+
             let qtd = parseInt(item.quantidade) || 1;
 
             if (item.eh_gelo_especial == 1 || item.eh_gelo_especial === true) {
+
                 if (qtd > 10) {
                     return 2.50;
-                } else {
-                    let pacotesDeSeis = Math.floor(qtd / 6);
-                    let restoUnidades = qtd % 6;
-                    let valorTotalLote =
-                        (pacotesDeSeis * 20.00) +
-                        (restoUnidades * 4.00);
-
-                    return valorTotalLote / qtd;
                 }
+
+                let pacotesDeSeis = Math.floor(qtd / 6);
+                let restoUnidades = qtd % 6;
+
+                let valorTotalLote =
+                    (pacotesDeSeis * 20.00) +
+                    (restoUnidades * 4.00);
+
+                return valorTotalLote / qtd;
             }
 
             const temAtacado =
@@ -824,6 +662,7 @@
         }
 
         function calcularTotalCarrinho() {
+
             let subtotalParcial = 0;
 
             carrinho.forEach(item => {
@@ -833,6 +672,7 @@
                 if (item.eh_gelo_especial == 1 || item.eh_gelo_especial === true) {
 
                     let qtd = parseInt(item.quantidade) || 1;
+
                     let pacotesDeSeis = Math.floor(qtd / 6);
                     let restoUnidades = qtd % 6;
 
@@ -849,6 +689,7 @@
             let valorTotalReal = 0;
 
             carrinho.forEach(item => {
+
                 let precoEfetivo =
                     calcularPrecoEfetivoItem(item, subtotalParcial);
 
@@ -878,19 +719,9 @@
             if (carrinho.length === 0) {
 
                 itensContainer.innerHTML = `
-                    <div class="text-center py-12">
-                        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-2xl mb-3">
-                            🛒
-                        </div>
-
-                        <p class="text-slate-500 text-sm font-semibold">
-                            Seu carrinho está vazio.
-                        </p>
-
-                        <p class="text-slate-400 text-xs mt-1">
-                            Adicione produtos para continuar.
-                        </p>
-                    </div>
+                    <p class="text-zinc-500 text-center py-8">
+                        Seu carrinho está vazio.
+                    </p>
                 `;
 
                 totalElemento.textContent = 'R$ 0,00';
@@ -919,16 +750,16 @@
                 if (item.eh_gelo_especial == 1 || item.eh_gelo_especial === true) {
 
                     avisoStatusHtml = `
-                        <span class="text-[10px] font-bold text-blue-600 block mt-1">
-                            🧊 Preço dinâmico aplicado
+                        <span class="text-[10px] sm:text-[11px] font-bold text-blue-600 block">
+                            Preço dinâmico de gelo especial aplicado
                         </span>
                     `;
 
                 } else if (passouDe250 && temAtacado) {
 
                     avisoStatusHtml = `
-                        <span class="text-[10px] font-bold text-emerald-600 block mt-1">
-                            📦 Preço atacado aplicado
+                        <span class="text-[10px] sm:text-[11px] font-bold text-emerald-600 block">
+                            Preço Atacado aplicado (acima de R$ 250)
                         </span>
                     `;
 
@@ -938,60 +769,63 @@
                         250.01 - subtotalParcial;
 
                     avisoStatusHtml = `
-                        <span class="text-[10px] text-slate-500 block mt-1">
-                            Faltam R$ ${faltaParaAtacado.toFixed(2)} para o atacado
+                        <span class="text-[10px] sm:text-[11px] text-zinc-500 block">
+                            Adicione mais R$ ${faltaParaAtacado.toFixed(2)} para ganhar o Atacado
                         </span>
                     `;
                 }
 
                 const saborTextoExibicao =
                     item.saborSelecionado
-                    ? `<span class="text-[10px] text-blue-600 font-bold block mt-0.5">Sabor: ${item.saborSelecionado}</span>`
+                    ? `
+                        <span class="text-[11px] text-blue-600 font-semibold block">
+                            Sabor: ${item.saborSelecionado}
+                        </span>
+                    `
                     : '';
 
                 itensContainer.innerHTML += `
-                    <div class="bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                    <div class="flex justify-between items-center bg-zinc-50 p-2.5 sm:p-3 rounded-lg border border-zinc-200 gap-2">
 
-                        <div class="flex justify-between items-center gap-3">
+                        <div class="flex-1 min-w-0">
 
-                            <div class="flex-1 min-w-0">
+                            <h5 class="font-semibold text-zinc-900 text-xs sm:text-sm truncate">
+                                ${item.nome}
+                            </h5>
 
-                                <h5 class="font-black text-slate-900 text-xs sm:text-sm truncate">
-                                    ${item.nome}
-                                </h5>
+                            ${saborTextoExibicao}
 
-                                ${saborTextoExibicao}
-
-                                <span class="text-xs text-blue-600 font-black block mt-1">
-                                    R$ ${precoEfetivo.toFixed(2)}
+                            <span class="text-xs text-blue-600 font-bold">
+                                R$ ${precoEfetivo.toFixed(2)}
+                                <span class="text-[10px] text-zinc-400 font-normal">
+                                    (${item.quantidade}x)
                                 </span>
+                            </span>
 
-                                ${avisoStatusHtml}
+                            ${avisoStatusHtml}
+                        </div>
 
-                            </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
 
-                            <div class="flex items-center gap-1 flex-shrink-0">
+                            <button onclick="alterarQuantidade('${item.itemKey}', -1)"
+                                    class="bg-zinc-200 hover:bg-zinc-300 text-zinc-800 w-6 h-6 rounded flex items-center justify-center text-xs font-bold">
+                                -
+                            </button>
 
-                                <button onclick="alterarQuantidade('${item.itemKey}', -1)"
-                                        class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black">
-                                    −
-                                </button>
+                            <span class="text-xs font-bold text-zinc-900 w-4 text-center">
+                                ${item.quantidade}
+                            </span>
 
-                                <span class="text-xs font-black text-slate-900 w-5 text-center">
-                                    ${item.quantidade}
-                                </span>
+                            <button onclick="alterarQuantidade('${item.itemKey}', 1)"
+                                    class="bg-zinc-200 hover:bg-zinc-300 text-zinc-800 w-6 h-6 rounded flex items-center justify-center text-xs font-bold">
+                                +
+                            </button>
 
-                                <button onclick="alterarQuantidade('${item.itemKey}', 1)"
-                                        class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black">
-                                    +
-                                </button>
-
-                                <button onclick="removerDoCarrinho('${item.itemKey}')"
-                                        class="w-7 h-7 rounded-lg text-red-500 hover:bg-red-50 font-bold ml-1">
-                                    🗑️
-                                </button>
-
-                            </div>
+                            <button onclick="removerDoCarrinho('${item.itemKey}')"
+                                    class="text-red-500 hover:text-red-600 text-xs ml-1 font-bold p-1"
+                                    title="Remover item">
+                                🗑
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1003,7 +837,9 @@
 
         function alterarQuantidade(itemKey, delta) {
 
-            const item = carrinho.find(p => p.itemKey === itemKey);
+            const item =
+                carrinho.find(p => p.itemKey === itemKey);
+
             if (!item) return;
 
             const produtoBase =
@@ -1031,6 +867,7 @@
         }
 
         function removerDoCarrinho(itemKey) {
+
             carrinho =
                 carrinho.filter(item => item.itemKey !== itemKey);
 
@@ -1038,34 +875,38 @@
         }
 
         function abrirCarrinho() {
-            document.getElementById('modal-carrinho')
-                .classList.remove('hidden');
 
-            document.body.classList.add('overflow-hidden');
+            document
+                .getElementById('modal-carrinho')
+                .classList.remove('hidden');
         }
 
         function fecharCarrinho() {
-            document.getElementById('modal-carrinho')
-                .classList.add('hidden');
 
-            document.body.classList.remove('overflow-hidden');
+            document
+                .getElementById('modal-carrinho')
+                .classList.add('hidden');
         }
 
         function mostrarFormularioCheckout() {
 
             if (carrinho.length === 0) {
+
                 alert('Seu carrinho está vazio!');
                 return;
             }
 
-            document.getElementById('form-checkout')
+            document
+                .getElementById('form-checkout')
                 .classList.remove('hidden');
 
-            document.getElementById('btn-ir-checkout')
+            document
+                .getElementById('btn-ir-checkout')
                 .classList.add('hidden');
         }
 
-        document.getElementById('form-checkout')
+        document
+            .getElementById('form-checkout')
             .addEventListener('submit', async (e) => {
 
                 e.preventDefault();
@@ -1085,6 +926,7 @@
                 } = calcularTotalCarrinho();
 
                 const dadosPedido = {
+
                     nome_cliente,
                     telefone,
                     endereco,
@@ -1109,13 +951,14 @@
 
                 try {
 
-                    const resposta = await fetch('/pedidos', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(dadosPedido)
-                    });
+                    const resposta =
+                        await fetch('/pedidos', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(dadosPedido)
+                        });
 
                     const resultado =
                         await resposta.json();
@@ -1124,15 +967,14 @@
 
                         fecharCarrinho();
 
-                        document.getElementById(
-                            'chave-pix-texto'
-                        ).textContent =
+                        document
+                            .getElementById('chave-pix-texto')
+                            .textContent =
                             'masterdistribuidoracm@gmail.com';
 
-                        document.getElementById('modal-pix')
+                        document
+                            .getElementById('modal-pix')
                             .classList.remove('hidden');
-
-                        document.body.classList.add('overflow-hidden');
 
                     } else {
 
@@ -1162,21 +1004,21 @@
                 document.getElementById('form-checkout');
 
             formCheckout.reset();
+
             formCheckout.classList.add('hidden');
 
-            document.getElementById('btn-ir-checkout')
+            document
+                .getElementById('btn-ir-checkout')
                 .classList.remove('hidden');
 
-            document.getElementById('modal-pix')
+            document
+                .getElementById('modal-pix')
                 .classList.add('hidden');
-
-            document.body.classList.remove('overflow-hidden');
 
             inicializarLoja();
         }
 
         inicializarLoja();
     </script>
-
 </body>
 </html>
