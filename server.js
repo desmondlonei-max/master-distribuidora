@@ -192,7 +192,7 @@ app.get('/pedidos', autenticarAdmin, async (req, res) => {
         const pedidosComItens = [];
         for (let ped of pedidos) {
             const [itens] = await connection.execute(`
-                SELECT ip.quantidade, COALESCE(ip.preco, ip.preco_unitario) AS preco, p.nome, p.sabores 
+                SELECT ip.quantidade, ip.preco AS preco, p.nome, p.sabores
                 FROM itens_pedido ip 
                 INNER JOIN produtos p ON ip.produto_id = p.id 
                 WHERE ip.pedido_id = ?
@@ -279,9 +279,9 @@ app.post('/pedidos', async (req, res) => {
 
         for (let item of itensValidados) {
             await connection.execute(
-                'INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco, preco_unitario) VALUES (?, ?, ?, ?, ?)',
-                [pedidoId, item.id, item.quantidade, item.preco, item.preco]
-            );
+             'INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco) VALUES (?, ?, ?, ?)',
+              [pedidoId, item.id, item.quantidade, item.preco]
+              );
         }
 
         await connection.commit();
