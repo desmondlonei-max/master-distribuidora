@@ -38,12 +38,14 @@ function autenticarAdmin(req, res, next) {
     }
 
     const assinaturaEsperada = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
+
     if (assinatura.length !== assinaturaEsperada.length || !crypto.timingSafeEqual(Buffer.from(assinatura), Buffer.from(assinaturaEsperada))) {
         return res.status(401).json({ erro: 'Token inválido.' });
     }
 
     try {
         const dados = JSON.parse(Buffer.from(payload, 'base64url').toString());
+
         if (dados.role !== 'admin' || dados.exp < Date.now()) {
             return res.status(401).json({ erro: 'Sessão expirada.' });
         }
@@ -56,9 +58,11 @@ function autenticarAdmin(req, res, next) {
 
 app.post('/admin/login', (req, res) => {
     const { senha } = req.body || {};
+
     if (!ADMIN_PASSWORD || senha !== ADMIN_PASSWORD) {
         return res.status(401).json({ erro: 'Senha incorreta!' });
     }
+
     res.json({ token: criarTokenAdmin() });
 });
 
@@ -67,116 +71,230 @@ app.post('/admin/login', (req, res) => {
 // ==========================================
 
 app.get('/produtos', async (req, res) => {
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial FROM produtos');
-        await connection.end();
+        connection = await mysql.createConnection(dbConfig);
+
+        const [rows] = await connection.execute(
+            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial FROM produtos'
+        );
+
         res.json(rows);
     } catch (erro) {
         console.error('Erro ao buscar produtos:', erro);
         res.status(500).json({ erro: 'Erro interno ao buscar produtos.' });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
 app.get('/produtos-destaque', async (req, res) => {
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT * FROM produtos WHERE destaque = 1 LIMIT 2');
-        await connection.end();
+        connection = await mysql.createConnection(dbConfig);
+
+        const [rows] = await connection.execute(
+            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial FROM produtos WHERE destaque = 1 LIMIT 2'
+        );
+
         res.json(rows);
     } catch (erro) {
         console.error('Erro ao buscar produtos em destaque:', erro);
         res.status(500).json({ erro: 'Erro interno ao buscar destaques.' });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
 app.post('/produtos', autenticarAdmin, async (req, res) => {
-    const { nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial } = req.body;
+    const {
+        nome,
+        categoria_id,
+        marca,
+        preco,
+        preco_atacado,
+        preco_custo,
+        volume,
+        teor_alcoolico,
+        estoque,
+        imagem,
+        descricao,
+        status,
+        destaque,
+        sabores,
+        eh_gelo_especial
+    } = req.body;
+
     const isDestaque = destaque ? 1 : 0;
     const isGeloEspecial = eh_gelo_especial ? 1 : 0;
 
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig);
+
         const query = `
-            INSERT INTO produtos (nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO produtos (
+                nome,
+                categoria_id,
+                marca,
+                preco,
+                preco_atacado,
+                preco_custo,
+                volume,
+                teor_alcoolico,
+                estoque,
+                imagem,
+                descricao,
+                status,
+                destaque,
+                sabores,
+                eh_gelo_especial
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
+
         await connection.execute(query, [
-            nome, 
-            categoria_id || 1, 
-            marca, 
-            preco, 
-            preco_atacado || 0, 
-            preco_custo || 0, 
-            volume, 
-            teor_alcoolico, 
-            estoque, 
-            imagem, 
-            descricao, 
-            status || 'disponivel', 
+            nome,
+            categoria_id || 1,
+            marca,
+            preco,
+            preco_atacado || 0,
+            preco_custo || 0,
+            volume,
+            teor_alcoolico,
+            estoque,
+            imagem,
+            descricao,
+            status || 'disponivel',
             isDestaque,
             sabores || null,
-            isGeloEspecial,
-            preco_especial || 0
+            isGeloEspecial
         ]);
-        await connection.end();
-        res.status(201).json({ sucesso: true, mensagem: 'Produto cadastrado com sucesso!' });
+
+        res.status(201).json({
+            sucesso: true,
+            mensagem: 'Produto cadastrado com sucesso!'
+        });
     } catch (erro) {
         console.error('Erro ao cadastrar produto:', erro);
-        res.status(500).json({ erro: 'Erro ao cadastrar produto.' });
+        res.status(500).json({
+            erro: 'Erro ao cadastrar produto.'
+        });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
 app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
     const { id } = req.params;
-    const { nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, preco_especial } = req.body;
+
+    const {
+        nome,
+        categoria_id,
+        marca,
+        preco,
+        preco_atacado,
+        preco_custo,
+        volume,
+        teor_alcoolico,
+        estoque,
+        imagem,
+        descricao,
+        status,
+        destaque,
+        sabores,
+        eh_gelo_especial
+    } = req.body;
+
     const isDestaque = destaque ? 1 : 0;
     const isGeloEspecial = eh_gelo_especial ? 1 : 0;
 
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig);
+
         const query = `
-            UPDATE produtos 
-            SET nome = ?, categoria_id = ?, marca = ?, preco = ?, preco_atacado = ?, preco_custo = ?, volume = ?, teor_alcoolico = ?, estoque = ?, imagem = ?, descricao = ?, status = ?, destaque = ?, sabores = ?, eh_gelo_especial = ?, preco_especial = ?
+            UPDATE produtos
+            SET
+                nome = ?,
+                categoria_id = ?,
+                marca = ?,
+                preco = ?,
+                preco_atacado = ?,
+                preco_custo = ?,
+                volume = ?,
+                teor_alcoolico = ?,
+                estoque = ?,
+                imagem = ?,
+                descricao = ?,
+                status = ?,
+                destaque = ?,
+                sabores = ?,
+                eh_gelo_especial = ?
             WHERE id = ?
         `;
+
         await connection.execute(query, [
-            nome, 
-            categoria_id || 1, 
-            marca, 
-            preco, 
-            preco_atacado || 0, 
-            preco_custo || 0, 
-            volume, 
-            teor_alcoolico, 
-            estoque, 
-            imagem, 
-            descricao, 
-            status || 'disponivel', 
-            isDestaque, 
+            nome,
+            categoria_id || 1,
+            marca,
+            preco,
+            preco_atacado || 0,
+            preco_custo || 0,
+            volume,
+            teor_alcoolico,
+            estoque,
+            imagem,
+            descricao,
+            status || 'disponivel',
+            isDestaque,
             sabores || null,
             isGeloEspecial,
-            preco_especial || 0,
             id
         ]);
-        await connection.end();
-        res.json({ sucesso: true, mensagem: 'Produto atualizado com sucesso!' });
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Produto atualizado com sucesso!'
+        });
     } catch (erro) {
         console.error('Erro ao atualizar produto:', erro);
-        res.status(500).json({ erro: 'Erro ao atualizar produto.' });
+        res.status(500).json({
+            erro: 'Erro ao atualizar produto.'
+        });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
 app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
     const { id } = req.params;
+
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        await connection.execute('DELETE FROM produtos WHERE id = ?', [id]);
-        await connection.end();
-        res.json({ sucesso: true, mensagem: 'Produto excluído com sucesso!' });
+        connection = await mysql.createConnection(dbConfig);
+
+        await connection.execute(
+            'DELETE FROM produtos WHERE id = ?',
+            [id]
+        );
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Produto excluído com sucesso!'
+        });
     } catch (erro) {
         console.error('Erro ao excluir produto:', erro);
-        res.status(500).json({ erro: 'Erro ao excluir produto.' });
+        res.status(500).json({
+            erro: 'Erro ao excluir produto.'
+        });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
@@ -185,36 +303,64 @@ app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
 // ==========================================
 
 app.get('/pedidos', autenticarAdmin, async (req, res) => {
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        const [pedidos] = await connection.execute(`SELECT id, nome_cliente, telefone, endereco, valor_total, status FROM pedidos ORDER BY id DESC`);
+        connection = await mysql.createConnection(dbConfig);
+
+        const [pedidos] = await connection.execute(
+            'SELECT id, nome_cliente, telefone, endereco, valor_total, status FROM pedidos ORDER BY id DESC'
+        );
 
         const pedidosComItens = [];
+
         for (let ped of pedidos) {
             const [itens] = await connection.execute(`
-                SELECT ip.quantidade, ip.preco AS preco, p.nome, p.sabores
-                FROM itens_pedido ip 
-                INNER JOIN produtos p ON ip.produto_id = p.id 
+                SELECT
+                    ip.quantidade,
+                    ip.preco AS preco,
+                    p.nome,
+                    p.sabores
+                FROM itens_pedido ip
+                INNER JOIN produtos p ON ip.produto_id = p.id
                 WHERE ip.pedido_id = ?
             `, [ped.id]);
 
-            pedidosComItens.push({ ...ped, itens });
+            pedidosComItens.push({
+                ...ped,
+                itens
+            });
         }
 
-        await connection.end();
         res.json(pedidosComItens);
     } catch (erro) {
         console.error('Erro ao buscar pedidos:', erro);
-        res.status(500).json({ erro: 'Erro interno ao buscar pedidos.' });
+        res.status(500).json({
+            erro: 'Erro interno ao buscar pedidos.'
+        });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
 app.post('/pedidos', async (req, res) => {
-    const { nome_cliente, telefone, endereco, itens } = req.body;
-    if (!itens || itens.length === 0) return res.status(400).json({ erro: 'O carrinho está vazio.' });
+    const {
+        nome_cliente,
+        telefone,
+        endereco,
+        itens
+    } = req.body;
 
-    const connection = await mysql.createConnection(dbConfig);
+    if (!itens || itens.length === 0) {
+        return res.status(400).json({
+            erro: 'O carrinho está vazio.'
+        });
+    }
+
+    let connection;
+
     try {
+        connection = await mysql.createConnection(dbConfig);
         await connection.beginTransaction();
 
         let subtotalVarejo = 0;
@@ -222,21 +368,39 @@ app.post('/pedidos', async (req, res) => {
 
         for (let item of itens) {
             const [rows] = await connection.execute(
-                'SELECT id, estoque, nome, preco, preco_atacado, eh_gelo_especial, preco_especial FROM produtos WHERE id = ?', 
+                'SELECT id, estoque, nome, preco, preco_atacado, eh_gelo_especial FROM produtos WHERE id = ?',
                 [item.id]
             );
-            if (rows.length === 0) throw new Error(`Produto ID ${item.id} não encontrado.`);
-            
-            const produtoDb = rows[0];
-            
-            if (produtoDb.estoque < item.quantidade) {
-                throw new Error(`Estoque insuficiente para "${produtoDb.nome}". Disponível: ${produtoDb.estoque}`);
+
+            if (rows.length === 0) {
+                throw new Error(`Produto ID ${item.id} não encontrado.`);
             }
 
-            // Define o preço base do item (dando prioridade ao preço especial caso seja gelo especial)
+            const produtoDb = rows[0];
+
+            if (produtoDb.estoque < item.quantidade) {
+                throw new Error(
+                    `Estoque insuficiente para "${produtoDb.nome}". Disponível: ${produtoDb.estoque}`
+                );
+            }
+
             let precoBaseItem = Number(produtoDb.preco);
-            if (produtoDb.eh_gelo_especial && produtoDb.preco_especial && Number(produtoDb.preco_especial) > 0) {
-                precoBaseItem = Number(produtoDb.preco_especial);
+
+            // Regra do gelo especial
+            if (produtoDb.eh_gelo_especial) {
+                const qtd = Number(item.quantidade);
+
+                if (qtd > 10) {
+                    precoBaseItem = 2.50;
+                } else {
+                    const pacotesDeSeis = Math.floor(qtd / 6);
+                    const restoUnidades = qtd % 6;
+                    const valorTotalLote =
+                        (pacotesDeSeis * 20.00) +
+                        (restoUnidades * 4.00);
+
+                    precoBaseItem = valorTotalLote / qtd;
+                }
             }
 
             subtotalVarejo += precoBaseItem * item.quantidade;
@@ -245,7 +409,9 @@ app.post('/pedidos', async (req, res) => {
                 id: produtoDb.id,
                 quantidade: item.quantidade,
                 preco_base: precoBaseItem,
-                preco_atacado: produtoDb.preco_atacado ? Number(produtoDb.preco_atacado) : 0,
+                preco_atacado: produtoDb.preco_atacado
+                    ? Number(produtoDb.preco_atacado)
+                    : 0,
                 eh_gelo: produtoDb.eh_gelo_especial
             });
         }
@@ -257,8 +423,11 @@ app.post('/pedidos', async (req, res) => {
         for (let prod of produtosDoPedido) {
             let precoFinalItem = prod.preco_base;
 
-            // Se atingiu atacado e o produto tem preço de atacado válido E NÃO É gelo especial (gelo especial geralmente não acumula atacado, ajuste se necessário)
-            if (atingiuAtacado && prod.preco_atacado > 0 && !prod.eh_gelo) {
+            if (
+                atingiuAtacado &&
+                prod.preco_atacado > 0 &&
+                !prod.eh_gelo
+            ) {
                 precoFinalItem = prod.preco_atacado;
             }
 
@@ -268,94 +437,195 @@ app.post('/pedidos', async (req, res) => {
                 preco: precoFinalItem
             });
 
-            novoValorTotalCalculado += precoFinalItem * prod.quantidade;
+            novoValorTotalCalculado +=
+                precoFinalItem * prod.quantidade;
         }
 
         const [resultadoPedido] = await connection.execute(
             'INSERT INTO pedidos (nome_cliente, telefone, endereco, valor_total, status) VALUES (?, ?, ?, ?, ?)',
-            [nome_cliente, telefone, endereco, novoValorTotalCalculado, 'pendente']
+            [
+                nome_cliente,
+                telefone,
+                endereco,
+                novoValorTotalCalculado,
+                'pendente'
+            ]
         );
+
         const pedidoId = resultadoPedido.insertId;
 
         for (let item of itensValidados) {
             await connection.execute(
-             'INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco) VALUES (?, ?, ?, ?)',
-              [pedidoId, item.id, item.quantidade, item.preco]
-              );
+                'INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco) VALUES (?, ?, ?, ?)',
+                [
+                    pedidoId,
+                    item.id,
+                    item.quantidade,
+                    item.preco
+                ]
+            );
         }
 
         await connection.commit();
-        await connection.end();
-        res.status(201).json({ sucesso: true, mensagem: 'Pedido realizado com sucesso!', chave_pix: 'masterdistribuidoracm@gmail.com' });
+
+        res.status(201).json({
+            sucesso: true,
+            mensagem: 'Pedido realizado com sucesso!',
+            chave_pix: 'masterdistribuidoracm@gmail.com'
+        });
     } catch (erro) {
-        await connection.rollback();
-        await connection.end();
-        res.status(400).json({ erro: erro.message || 'Erro ao processar o pedido.' });
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch {}
+        }
+
+        console.error('Erro ao processar pedido:', erro);
+
+        res.status(400).json({
+            erro: erro.message || 'Erro ao processar o pedido.'
+        });
+    } finally {
+        if (connection) {
+            await connection.end();
+        }
     }
 });
 
 app.put('/pedidos/:id/status', autenticarAdmin, async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body; 
+    const { status } = req.body;
 
-    const connection = await mysql.createConnection(dbConfig);
+    let connection;
+
     try {
+        connection = await mysql.createConnection(dbConfig);
         await connection.beginTransaction();
 
-        const [pedidoRows] = await connection.execute('SELECT status FROM pedidos WHERE id = ?', [id]);
-        if (pedidoRows.length === 0) throw new Error('Pedido não encontrado.');
+        const [pedidoRows] = await connection.execute(
+            'SELECT status FROM pedidos WHERE id = ?',
+            [id]
+        );
+
+        if (pedidoRows.length === 0) {
+            throw new Error('Pedido não encontrado.');
+        }
+
         const statusAnterior = pedidoRows[0].status;
 
-        await connection.execute('UPDATE pedidos SET status = ? WHERE id = ?', [status, id]);
+        await connection.execute(
+            'UPDATE pedidos SET status = ? WHERE id = ?',
+            [status, id]
+        );
 
         if (status === 'pago' && statusAnterior !== 'pago') {
-            const [itens] = await connection.execute('SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id = ?', [id]);
+            const [itens] = await connection.execute(
+                'SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id = ?',
+                [id]
+            );
+
             for (let item of itens) {
-                await connection.execute('UPDATE produtos SET estoque = estoque - ? WHERE id = ?', [item.quantidade, item.produto_id]);
+                await connection.execute(
+                    'UPDATE produtos SET estoque = estoque - ? WHERE id = ?',
+                    [
+                        item.quantidade,
+                        item.produto_id
+                    ]
+                );
             }
-        } else if (status === 'cancelado' && statusAnterior === 'pago') {
-            const [itens] = await connection.execute('SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id = ?', [id]);
+        } else if (
+            status === 'cancelado' &&
+            statusAnterior === 'pago'
+        ) {
+            const [itens] = await connection.execute(
+                'SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id = ?',
+                [id]
+            );
+
             for (let item of itens) {
-                await connection.execute('UPDATE produtos SET estoque = estoque + ? WHERE id = ?', [item.quantidade, item.produto_id]);
+                await connection.execute(
+                    'UPDATE produtos SET estoque = estoque + ? WHERE id = ?',
+                    [
+                        item.quantidade,
+                        item.produto_id
+                    ]
+                );
             }
         }
 
         await connection.commit();
-        await connection.end();
-        res.json({ sucesso: true, mensagem: 'Status atualizado com sucesso!' });
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Status atualizado com sucesso!'
+        });
     } catch (erro) {
-        await connection.rollback();
-        await connection.end();
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch {}
+        }
+
         console.error('Erro ao atualizar status:', erro);
-        res.status(500).json({ erro: erro.message || 'Erro ao atualizar o status.' });
+
+        res.status(500).json({
+            erro: erro.message || 'Erro ao atualizar o status.'
+        });
+    } finally {
+        if (connection) {
+            await connection.end();
+        }
     }
 });
 
 app.delete('/pedidos/:id', autenticarAdmin, async (req, res) => {
     const { id } = req.params;
+
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        await connection.execute('DELETE FROM pedidos WHERE id = ?', [id]);
-        await connection.end();
-        res.json({ sucesso: true, mensagem: 'Pedido excluído com sucesso!' });
+        connection = await mysql.createConnection(dbConfig);
+
+        await connection.execute(
+            'DELETE FROM pedidos WHERE id = ?',
+            [id]
+        );
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Pedido excluído com sucesso!'
+        });
     } catch (erro) {
         console.error('Erro ao excluir pedido:', erro);
-        res.status(500).json({ erro: 'Erro ao excluir pedido.' });
+
+        res.status(500).json({
+            erro: 'Erro ao excluir pedido.'
+        });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
 app.get('/relatorio-semanal', autenticarAdmin, async (req, res) => {
+    let connection;
+
     try {
-        const connection = await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig);
+
         const query = `
-            SELECT p.id AS pedido_id, ip.quantidade, ip.preco AS preco_venda, pr.preco_custo
+            SELECT
+                p.id AS pedido_id,
+                ip.quantidade,
+                ip.preco AS preco_venda,
+                pr.preco_custo
             FROM pedidos p
             JOIN itens_pedido ip ON p.id = ip.pedido_id
             JOIN produtos pr ON ip.produto_id = pr.id
-            WHERE p.status != 'cancelado' AND YEARWEEK(p.data_criacao, 0) = YEARWEEK(CURDATE(), 0)
+            WHERE p.status != 'cancelado'
+            AND YEARWEEK(p.data_criacao, 0) = YEARWEEK(CURDATE(), 0)
         `;
+
         const [rows] = await connection.execute(query);
-        await connection.end();
 
         let faturamentoTotal = 0;
         let custoTotal = 0;
@@ -363,18 +633,34 @@ app.get('/relatorio-semanal', autenticarAdmin, async (req, res) => {
 
         rows.forEach(row => {
             pedidosSemana.add(row.pedido_id);
-            faturamentoTotal += Number(row.preco_venda) * row.quantidade;
-            custoTotal += Number(row.preco_custo || 0) * row.quantidade;
+
+            faturamentoTotal +=
+                Number(row.preco_venda) *
+                row.quantidade;
+
+            custoTotal +=
+                Number(row.preco_custo || 0) *
+                row.quantidade;
         });
 
-        res.json({ total_pedidos: pedidosSemana.size, faturamento: faturamentoTotal, lucro: faturamentoTotal - custoTotal });
+        res.json({
+            total_pedidos: pedidosSemana.size,
+            faturamento: faturamentoTotal,
+            lucro: faturamentoTotal - custoTotal
+        });
     } catch (erro) {
         console.error('Erro ao gerar relatório:', erro);
-        res.status(500).json({ erro: 'Erro ao gerar relatório.' });
+
+        res.status(500).json({
+            erro: 'Erro ao gerar relatório.'
+        });
+    } finally {
+        if (connection) await connection.end();
     }
 });
 
 const PORTA = Number(process.env.PORT || 3000);
+
 app.listen(PORTA, '0.0.0.0', () => {
     console.log(`Servidor rodando na porta ${PORTA} 🚀`);
 });
