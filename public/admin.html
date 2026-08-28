@@ -80,6 +80,10 @@
                     <!-- CAMPOS COMUNS (produto base) -->
                     <input type="text" id="nome" placeholder="Nome do Produto (Ex: Vodka Marca X)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                     <input type="text" id="marca" placeholder="Marca" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="flex gap-1">
+                        <select id="categoria_id" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                        <button type="button" onclick="criarNovaCategoria()" title="Nova categoria" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm rounded-xl px-3">+</button>
+                    </div>
                     <input type="text" id="volume" placeholder="Volume (ex: 200g)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" step="0.1" id="teor_alcoolico" placeholder="Teor Alcoólico (%)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
 
@@ -232,13 +236,27 @@
 
             const div = document.createElement('div');
             div.id = linhaId;
-            div.className = 'grid grid-cols-2 md:grid-cols-6 gap-2 bg-white border border-blue-100 rounded-lg p-3';
+            div.className = 'bg-white border border-blue-100 rounded-lg p-3 space-y-2';
             div.innerHTML = `
-                <input type="text" placeholder="Sabor (ex: Melancia)" data-campo="sabor" value="${valores.sabor || ''}" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                <input type="number" step="0.01" placeholder="Preço (R$)" data-campo="preco" value="${valores.preco || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                <input type="number" placeholder="Estoque" data-campo="estoque" value="${valores.estoque || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                <input type="text" placeholder="URL da imagem" data-campo="imagem" value="${valores.imagem || ''}" class="col-span-2 md:col-span-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                <button type="button" onclick="document.getElementById('${linhaId}').remove()" class="bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold py-1.5">Remover</button>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <input type="text" placeholder="Sabor (ex: Melancia)" data-campo="sabor" value="${valores.sabor || ''}" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="text" placeholder="URL da imagem" data-campo="imagem" value="${valores.imagem || ''}" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    <input type="number" step="0.01" placeholder="Preço Varejo (R$)" data-campo="preco" value="${valores.preco || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" placeholder="Preço Atacado (R$)" data-campo="preco_atacado" value="${valores.preco_atacado || ''}" class="border border-blue-200 bg-blue-50/50 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" placeholder="Preço Custo (R$)" data-campo="preco_custo" value="${valores.preco_custo || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" placeholder="Preço Promo (R$)" data-campo="preco_promocional" value="${valores.preco_promocional || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" placeholder="Estoque" data-campo="estoque" value="${valores.estoque || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <select data-campo="status" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <option value="disponivel" ${(!valores.status || valores.status === 'disponivel') ? 'selected' : ''}>Disponível</option>
+                        <option value="poucas_unidades" ${valores.status === 'poucas_unidades' ? 'selected' : ''}>Poucas Unidades</option>
+                        <option value="esgotado" ${valores.status === 'esgotado' ? 'selected' : ''}>Esgotado</option>
+                    </select>
+                    <button type="button" onclick="document.getElementById('${linhaId}').remove()" class="bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold py-1.5">Remover sabor</button>
+                </div>
             `;
 
             document.getElementById('lista-linhas-variacao').appendChild(div);
@@ -251,15 +269,65 @@
             linhas.forEach(linha => {
                 const sabor = linha.querySelector('[data-campo="sabor"]').value.trim();
                 const preco = parseFloat(linha.querySelector('[data-campo="preco"]').value);
+                const preco_atacado = parseFloat(linha.querySelector('[data-campo="preco_atacado"]').value) || 0;
+                const preco_custo = parseFloat(linha.querySelector('[data-campo="preco_custo"]').value) || 0;
+                const preco_promocional = parseFloat(linha.querySelector('[data-campo="preco_promocional"]').value) || null;
                 const estoque = parseInt(linha.querySelector('[data-campo="estoque"]').value) || 0;
                 const imagem = linha.querySelector('[data-campo="imagem"]').value.trim() || null;
+                const status = linha.querySelector('[data-campo="status"]').value;
 
                 if (sabor && !isNaN(preco)) {
-                    variacoes.push({ sabor, preco, estoque, imagem, status: 'disponivel' });
+                    variacoes.push({ sabor, preco, preco_atacado, preco_custo, preco_promocional, estoque, imagem, status });
                 }
             });
 
             return variacoes;
+        }
+
+        // ==========================================
+        // CATEGORIAS
+        // ==========================================
+
+        async function carregarCategorias(categoriaSelecionada = null) {
+            try {
+                const res = await apiFetch(`${API_URL}/categorias`);
+                const categorias = await res.json();
+
+                const select = document.getElementById('categoria_id');
+                select.innerHTML = categorias.map(c =>
+                    `<option value="${c.id}">${c.nome}</option>`
+                ).join('');
+
+                if (categoriaSelecionada) {
+                    select.value = categoriaSelecionada;
+                }
+            } catch (err) {
+                console.error('Erro ao carregar categorias:', err);
+            }
+        }
+
+        async function criarNovaCategoria() {
+            const nome = prompt('Nome da nova categoria (ex: Whiskys, Energéticos, Vodkas):');
+            if (!nome || !nome.trim()) return;
+
+            try {
+                const res = await apiFetch(`${API_URL}/categorias`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome })
+                });
+
+                const resultado = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    await carregarCategorias(resultado.id);
+                } else {
+                    alert('Erro ao criar categoria: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao criar categoria:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -298,6 +366,7 @@
         function mostrarPainel() {
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('painel-content').classList.remove('hidden');
+            carregarCategorias();
             carregarRelatorioSemanal();
             carregarProdutos();
             carregarPedidos();
@@ -413,39 +482,67 @@
             const container = document.getElementById(`conteudo-sabores-${produtoId}`);
 
             const linhasHtml = p.variacoes.map(v => `
-                <div class="grid grid-cols-2 md:grid-cols-6 gap-2 bg-white border border-gray-200 rounded-lg p-3 items-center" id="variacao-${v.id}">
-                    <input type="text" value="${v.sabor}" data-campo="sabor" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                    <input type="number" step="0.01" value="${v.preco}" data-campo="preco" placeholder="Preço" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                    <input type="number" value="${v.estoque}" data-campo="estoque" placeholder="Estoque" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                    <input type="text" value="${v.imagem || ''}" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-                    <div class="flex gap-1">
-                        <button onclick="salvarVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-green-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-green-700">Salvar</button>
-                        <button onclick="excluirVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-red-50 text-red-600 text-xs font-bold rounded-lg py-1.5 hover:bg-red-100">Excluir</button>
+                <div class="bg-white border border-gray-200 rounded-lg p-3 space-y-2" id="variacao-${v.id}">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <input type="text" value="${v.sabor}" data-campo="sabor" placeholder="Sabor" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="text" value="${v.imagem || ''}" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        <input type="number" step="0.01" value="${v.preco}" data-campo="preco" placeholder="Preço Varejo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" value="${v.preco_atacado || ''}" data-campo="preco_atacado" placeholder="Preço Atacado" class="border border-blue-200 bg-blue-50/50 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" value="${v.preco_custo || ''}" data-campo="preco_custo" placeholder="Preço Custo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" value="${v.preco_promocional || ''}" data-campo="preco_promocional" placeholder="Preço Promo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" value="${v.estoque}" data-campo="estoque" placeholder="Estoque" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                        <select data-campo="status" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                            <option value="disponivel" ${v.status === 'disponivel' ? 'selected' : ''}>Disponível</option>
+                            <option value="poucas_unidades" ${v.status === 'poucas_unidades' ? 'selected' : ''}>Poucas Unidades</option>
+                            <option value="esgotado" ${v.status === 'esgotado' ? 'selected' : ''}>Esgotado</option>
+                        </select>
+                        <div class="col-span-2 md:col-span-3 flex gap-1">
+                            <button onclick="salvarVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-green-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-green-700">Salvar</button>
+                            <button onclick="excluirVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-red-50 text-red-600 text-xs font-bold rounded-lg py-1.5 hover:bg-red-100">Excluir</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
 
             container.innerHTML = `
                 <div class="space-y-2 mb-3">${linhasHtml}</div>
-                <div class="grid grid-cols-2 md:grid-cols-6 gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 items-center" id="nova-variacao-${produtoId}">
-                    <input type="text" data-campo="sabor" placeholder="Novo sabor" class="col-span-2 md:col-span-2 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
-                    <input type="number" step="0.01" data-campo="preco" placeholder="Preço" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
-                    <input type="number" data-campo="estoque" placeholder="Estoque" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
-                    <input type="text" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-1 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
-                    <button onclick="adicionarSaborExistente(${produtoId})" class="bg-blue-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-blue-700">+ Adicionar sabor</button>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2" id="nova-variacao-${produtoId}">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <input type="text" data-campo="sabor" placeholder="Novo sabor" class="col-span-2 md:col-span-2 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="text" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-2 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        <input type="number" step="0.01" data-campo="preco" placeholder="Preço Varejo" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" data-campo="preco_atacado" placeholder="Preço Atacado" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" data-campo="preco_custo" placeholder="Preço Custo" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" data-campo="preco_promocional" placeholder="Preço Promo" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" data-campo="estoque" placeholder="Estoque" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <button onclick="adicionarSaborExistente(${produtoId})" class="w-full bg-blue-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-blue-700">+ Adicionar sabor</button>
                 </div>
             `;
         }
 
+        function lerCamposVariacao(elemento) {
+            return {
+                sabor: elemento.querySelector('[data-campo="sabor"]').value,
+                preco: parseFloat(elemento.querySelector('[data-campo="preco"]').value) || 0,
+                preco_atacado: parseFloat(elemento.querySelector('[data-campo="preco_atacado"]').value) || 0,
+                preco_custo: parseFloat(elemento.querySelector('[data-campo="preco_custo"]').value) || 0,
+                preco_promocional: parseFloat(elemento.querySelector('[data-campo="preco_promocional"]').value) || null,
+                estoque: parseInt(elemento.querySelector('[data-campo="estoque"]').value) || 0,
+                imagem: elemento.querySelector('[data-campo="imagem"]').value || null,
+                status: elemento.querySelector('[data-campo="status"]') ? elemento.querySelector('[data-campo="status"]').value : 'disponivel'
+            };
+        }
+
         async function salvarVariacaoInline(produtoId, variacaoId) {
             const linha = document.getElementById(`variacao-${variacaoId}`);
-            const dados = {
-                sabor: linha.querySelector('[data-campo="sabor"]').value,
-                preco: parseFloat(linha.querySelector('[data-campo="preco"]').value) || 0,
-                estoque: parseInt(linha.querySelector('[data-campo="estoque"]').value) || 0,
-                imagem: linha.querySelector('[data-campo="imagem"]').value || null,
-                status: 'disponivel'
-            };
+            const dados = lerCamposVariacao(linha);
 
             try {
                 const res = await apiFetch(`${API_URL}/produto-variacoes/${variacaoId}`, {
@@ -491,13 +588,7 @@
 
         async function adicionarSaborExistente(produtoId) {
             const bloco = document.getElementById(`nova-variacao-${produtoId}`);
-            const dados = {
-                sabor: bloco.querySelector('[data-campo="sabor"]').value,
-                preco: parseFloat(bloco.querySelector('[data-campo="preco"]').value) || 0,
-                estoque: parseInt(bloco.querySelector('[data-campo="estoque"]').value) || 0,
-                imagem: bloco.querySelector('[data-campo="imagem"]').value || null,
-                status: 'disponivel'
-            };
+            const dados = lerCamposVariacao(bloco);
 
             if (!dados.sabor.trim()) {
                 alert('Informe o nome do sabor.');
@@ -547,7 +638,7 @@
                     descricao: document.getElementById('descricao').value || null,
                     destaque: document.getElementById('destaque').checked ? 1 : 0,
                     eh_gelo_especial: document.getElementById('eh_gelo_especial').checked ? 1 : 0,
-                    categoria_id: 1,
+                    categoria_id: parseInt(document.getElementById('categoria_id').value) || null,
                     variacoes
                 };
 
@@ -591,7 +682,7 @@
                 destaque: document.getElementById('destaque').checked ? 1 : 0,
                 eh_gelo_especial: document.getElementById('eh_gelo_especial').checked ? 1 : 0,
                 descricao: document.getElementById('descricao').value || null,
-                categoria_id: 1
+                categoria_id: parseInt(document.getElementById('categoria_id').value) || null
             };
 
             const metodo = id ? 'PUT' : 'POST';
@@ -635,6 +726,7 @@
             document.getElementById('produto-id').value = p.id;
             document.getElementById('nome').value = p.nome;
             document.getElementById('marca').value = p.marca || '';
+            document.getElementById('categoria_id').value = p.categoria_id || '';
             document.getElementById('preco').value = p.preco;
             document.getElementById('preco_atacado').value = p.preco_atacado || '';
             document.getElementById('preco_custo').value = p.preco_custo || 0;
@@ -748,3 +840,4 @@
     </script>
 </body>
 </html>
+
