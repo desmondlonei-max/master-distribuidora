@@ -86,6 +86,65 @@ async function buscarVariacoesAgrupadas(connection) {
     return porProduto;
 }
 
+// ==========================================
+// ROTAS DE CATEGORIAS
+// ==========================================
+
+app.get('/categorias', async (req, res) => {
+    let connection;
+
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const [rows] = await connection.execute(
+            'SELECT id, nome, slug FROM categorias ORDER BY nome'
+        );
+        res.json(rows);
+    } catch (erro) {
+        console.error('Erro ao buscar categorias:', erro);
+        res.status(500).json({ erro: 'Erro interno ao buscar categorias.' });
+    } finally {
+        if (connection) await connection.end();
+    }
+});
+
+app.post('/categorias', autenticarAdmin, async (req, res) => {
+    const { nome } = req.body;
+
+    if (!nome || !nome.trim()) {
+        return res.status(400).json({ erro: 'Informe o nome da categoria.' });
+    }
+
+    const slug = nome
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+    let connection;
+
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const [resultado] = await connection.execute(
+            'INSERT INTO categorias (nome, slug) VALUES (?, ?)',
+            [nome.trim(), slug]
+        );
+
+        res.status(201).json({ sucesso: true, id: resultado.insertId, nome: nome.trim(), slug });
+    } catch (erro) {
+        console.error('Erro ao criar categoria:', erro);
+
+        if (erro.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ erro: 'Já existe uma categoria com esse nome.' });
+        }
+
+        res.status(500).json({ erro: 'Erro interno ao criar categoria.' });
+    } finally {
+        if (connection) await connection.end();
+    }
+});
+
 app.get('/produtos', async (req, res) => {
     let connection;
 
