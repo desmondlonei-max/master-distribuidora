@@ -358,39 +358,13 @@
     </section>
 
 
-    <!-- ==================== PRODUTOS COM VARIAÇÕES DE SABOR ==================== -->
+    <!-- ==================== CATÁLOGOS DE PRODUTOS COM VARIAÇÃO DE SABOR ==================== -->
+    <!-- Cada produto cadastrado com variações (ex: "Jack James") ganha aqui seu próprio -->
+    <!-- catálogo, com o nome do produto como título e os sabores dele logo abaixo.       -->
     <section id="produtos-variacoes-secao"
              class="max-w-7xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 hidden">
 
-        <div class="flex flex-col sm:flex-row justify-between sm:items-end gap-3 mb-8">
-
-            <div>
-
-                <div class="flex items-center gap-2 mb-2">
-
-                    <span class="w-8 h-1 bg-blue-600 rounded-full"></span>
-
-                    <span class="text-blue-600 text-xs font-black uppercase tracking-widest">
-                        Escolha seu sabor
-                    </span>
-
-                </div>
-
-                <h3 class="text-2xl sm:text-3xl font-black text-slate-900">
-                    Produtos com variações
-                </h3>
-
-                <p class="text-sm text-slate-500 mt-1">
-                    Mesmo produto, vários sabores para escolher.
-                </p>
-
-            </div>
-
-        </div>
-
-        <div id="lista-produtos-variacoes"
-             class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        </div>
+        <div id="catalogos-variacoes" class="space-y-14"></div>
 
     </section>
 
@@ -1040,14 +1014,14 @@
                 const secaoVariacoes =
                     document.getElementById('produtos-variacoes-secao');
 
-                const containerVariacoes =
-                    document.getElementById('lista-produtos-variacoes');
+                const containerCatalogos =
+                    document.getElementById('catalogos-variacoes');
 
-                containerVariacoes.innerHTML = '';
+                containerCatalogos.innerHTML = '';
 
                 if (produtosComVariacao.length > 0) {
                     secaoVariacoes.classList.remove('hidden');
-                    produtosComVariacao.forEach(produto => renderizarCardProduto(produto, containerVariacoes));
+                    produtosComVariacao.forEach(produto => renderizarCatalogoVariacoes(produto, containerCatalogos));
                 } else {
                     secaoVariacoes.classList.add('hidden');
                 }
@@ -1100,6 +1074,178 @@
 
         // Monta o card de um produto e anexa ao container informado.
         // Usado tanto para a grade normal quanto para a seção de produtos com variações.
+        // Monta o "mini card" de um único sabor dentro do catálogo do produto.
+        function gerarCardVariacao(produto, variacao) {
+
+            const imagemUrl = variacao.imagem || produto.imagem;
+
+            const imagemHtml =
+                imagemUrl
+                ? `<img src="${imagemUrl}"
+                        alt="${produto.nome} - ${variacao.sabor}"
+                        class="w-full h-full object-contain transition duration-300 group-hover:scale-105">`
+
+                : `<div class="flex flex-col items-center justify-center gap-2 text-slate-300">
+
+                       <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-10 h-10"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            stroke-width="1.5">
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  d="M7 3h10v4a5 5 0 01-10 0V3zM12 12v8m-4 0h8"/>
+                       </svg>
+
+                       <span class="font-semibold text-xs">
+                           Sem Foto
+                       </span>
+
+                   </div>`;
+
+            const semEstoque = Number(variacao.estoque) <= 0;
+            const poucasUnidades = variacao.status === 'poucas_unidades';
+
+            const badgeEstoque =
+                semEstoque || variacao.status === 'esgotado'
+                ? `<span class="absolute top-2.5 left-2.5 bg-slate-900/90 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full">Esgotado</span>`
+                : poucasUnidades
+                ? `<span class="absolute top-2.5 left-2.5 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full">Poucas unidades</span>`
+                : '';
+
+            const temAtacado = Number(variacao.preco_atacado) > 0;
+
+            const blocoAtacado =
+                temAtacado
+                ? `<p class="text-[11px] text-blue-600 font-semibold mt-0.5">
+                       Atacado: R$ ${Number(variacao.preco_atacado).toFixed(2)}
+                   </p>`
+                : '';
+
+            return `
+                <div class="group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-200 transition flex flex-col">
+
+                    <div class="relative aspect-square bg-slate-50 flex items-center justify-center p-4">
+                        ${badgeEstoque}
+                        ${imagemHtml}
+                    </div>
+
+                    <div class="p-4 flex flex-col flex-1">
+
+                        <h4 class="font-bold text-slate-900 text-sm leading-snug">
+                            ${variacao.sabor}
+                        </h4>
+
+                        <div class="mt-2 mb-3">
+                            <span class="text-lg font-black text-slate-900">
+                                R$ ${Number(variacao.preco).toFixed(2)}
+                            </span>
+                            ${blocoAtacado}
+                        </div>
+
+                        <button onclick="adicionarVariacaoDireto(${produto.id}, ${variacao.id})"
+                                ${semEstoque ? 'disabled' : ''}
+                                class="mt-auto w-full ${semEstoque ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'} font-bold text-xs py-2.5 rounded-xl transition">
+                            ${semEstoque ? 'Esgotado' : 'Adicionar'}
+                        </button>
+
+                    </div>
+
+                </div>
+            `;
+        }
+
+        // Monta o catálogo completo de um produto com variações: título com o
+        // nome do produto (ex: "Jack James") e, logo abaixo, um sabor por card.
+        function renderizarCatalogoVariacoes(produto, container) {
+
+            const cardsHtml =
+                produto.variacoes
+                    .map(v => gerarCardVariacao(produto, v))
+                    .join('');
+
+            const subtitulo =
+                [produto.marca, produto.volume]
+                    .filter(Boolean)
+                    .join(' · ');
+
+            const bloco = document.createElement('div');
+
+            bloco.innerHTML = `
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="w-8 h-1 bg-blue-600 rounded-full"></span>
+                    <span class="text-blue-600 text-xs font-black uppercase tracking-widest">
+                        Catálogo
+                    </span>
+                </div>
+
+                <h3 class="text-2xl sm:text-3xl font-black text-slate-900">
+                    ${produto.nome}
+                </h3>
+
+                ${subtitulo ? `<p class="text-sm text-slate-500 mt-1">${subtitulo} — escolha o sabor</p>` : ''}
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mt-6">
+                    ${cardsHtml}
+                </div>
+            `;
+
+            container.appendChild(bloco);
+        }
+
+        // Adiciona um sabor específico ao carrinho diretamente (cada card do
+        // catálogo já representa um único sabor, sem precisar de seletor).
+        function adicionarVariacaoDireto(produtoId, variacaoId) {
+
+            const produto =
+                produtosLoja.find(p => p.id === produtoId) ||
+                promocoesLoja.find(p => p.id === produtoId);
+
+            if (!produto) return;
+
+            const variacao =
+                produto.variacoes.find(v => v.id === variacaoId);
+
+            if (!variacao) return;
+
+            const itemKey = `${produtoId}-v${variacao.id}`;
+
+            const itemExistente =
+                carrinho.find(item => item.itemKey === itemKey);
+
+            const quantidadeAtual =
+                itemExistente ? itemExistente.quantidade : 0;
+
+            const estoqueDisponivel = Number(variacao.estoque) || 0;
+
+            if (quantidadeAtual + 1 > estoqueDisponivel) {
+                alert(`Desculpe, temos apenas ${estoqueDisponivel} unidades deste sabor em estoque.`);
+                return;
+            }
+
+            if (itemExistente) {
+                itemExistente.quantidade++;
+            } else {
+                carrinho.push({
+                    ...produto,
+                    id: produtoId,
+                    itemKey,
+                    variacao_id: variacao.id,
+                    saborSelecionado: variacao.sabor,
+                    preco: Number(variacao.preco),
+                    preco_atacado: Number(variacao.preco_atacado || 0),
+                    estoque: estoqueDisponivel,
+                    imagem: variacao.imagem || produto.imagem,
+                    eh_gelo_especial: false,
+                    quantidade: 1
+                });
+            }
+
+            atualizarCarrinhoUI();
+            abrirCarrinho();
+        }
+
         function renderizarCardProduto(produto, container) {
 
                     const imagemHtml =
@@ -2157,3 +2303,4 @@
 
 </body>
 </html>
+
