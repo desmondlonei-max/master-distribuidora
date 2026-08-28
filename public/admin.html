@@ -61,31 +61,41 @@
             <!-- GERENCIAR PRODUTOS -->
             <section class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
                 <h2 id="titulo-form" class="text-base sm:text-lg font-bold mb-4 text-gray-800">Cadastrar Produto</h2>
+
+                <!-- SELETOR: PRODUTO ÚNICO x PRODUTO COM VARIAÇÕES -->
+                <div id="seletor-tipo-cadastro" class="flex flex-col sm:flex-row gap-2 mb-4">
+                    <button type="button" id="btn-tipo-unico" onclick="alternarTipoCadastro('unico')"
+                            class="flex-1 border-2 border-blue-600 bg-blue-600 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition">
+                        Produto Único
+                    </button>
+                    <button type="button" id="btn-tipo-variacoes" onclick="alternarTipoCadastro('variacoes')"
+                            class="flex-1 border-2 border-blue-200 bg-white text-blue-700 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition">
+                        Produto com Variações (Sabores)
+                    </button>
+                </div>
+
                 <form id="form-produto" onsubmit="salvarProduto(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input type="hidden" id="produto-id">
-                    <input type="text" id="nome" placeholder="Nome do Produto (Ex: Gelo Saborizado)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+
+                    <!-- CAMPOS COMUNS (produto base) -->
+                    <input type="text" id="nome" placeholder="Nome do Produto (Ex: Vodka Marca X)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                     <input type="text" id="marca" placeholder="Marca" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    
-                    <!-- PREÇO DE VAREJO / BASE -->
-                    <input type="number" step="0.01" id="preco" placeholder="Preço Padrão / Unidade (R$)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    
-                    <!-- PREÇO DE ATACADO -->
-                    <input type="number" step="0.01" id="preco_atacado" placeholder="Preço Atacado / Pacote (R$)" class="border rounded-xl px-3 py-2 text-sm bg-blue-50/50 border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    
-                    <input type="number" step="0.01" id="preco_custo" placeholder="Preço de Custo (R$)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    <input type="number" id="estoque" placeholder="Estoque Disponível" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                     <input type="text" id="volume" placeholder="Volume (ex: 200g)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" step="0.1" id="teor_alcoolico" placeholder="Teor Alcoólico (%)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    
-                    <!-- CAMPO DE SABORES -->
-                    <input type="text" id="sabores" placeholder="Sabores (Sep. por vírgula: ex: Melancia, Maçã Verde)" class="border border-blue-300 bg-blue-50/30 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
 
-                    <input type="text" id="imagem" placeholder="URL da Imagem" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    <select id="status" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="disponivel">Disponível</option>
-                        <option value="poucas_unidades">Poucas Unidades</option>
-                        <option value="esgotado">Esgotado</option>
-                    </select>
+                    <!-- CAMPOS EXCLUSIVOS DE PRODUTO ÚNICO -->
+                    <div id="campos-produto-unico" class="contents">
+                        <input type="number" step="0.01" id="preco" placeholder="Preço Padrão / Unidade (R$)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" step="0.01" id="preco_atacado" placeholder="Preço Atacado / Pacote (R$)" class="border rounded-xl px-3 py-2 text-sm bg-blue-50/50 border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" step="0.01" id="preco_custo" placeholder="Preço de Custo (R$)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="estoque" placeholder="Estoque Disponível" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="imagem" placeholder="URL da Imagem" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="status" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="disponivel">Disponível</option>
+                            <option value="poucas_unidades">Poucas Unidades</option>
+                            <option value="esgotado">Esgotado</option>
+                        </select>
+                    </div>
 
                     <!-- CAMPO: TIPO ESPECIAL DE PRODUTO (GELO) -->
                     <div class="md:col-span-3 flex items-center gap-2 bg-purple-50 border border-purple-200 p-3 rounded-xl">
@@ -100,9 +110,19 @@
                     </div>
 
                     <textarea id="descricao" placeholder="Descrição" class="border border-gray-300 rounded-xl px-3 py-2 text-sm md:col-span-3 focus:outline-none focus:ring-2 focus:ring-blue-500" rows="2"></textarea>
-                    
+
+                    <!-- BLOCO DE VARIAÇÕES (SABORES) - só aparece no modo "Produto com Variações" -->
+                    <div id="bloco-variacoes" class="hidden md:col-span-3 border-2 border-dashed border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-blue-900">Sabores deste produto</h3>
+                            <button type="button" onclick="adicionarLinhaVariacao()" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700">+ Adicionar sabor</button>
+                        </div>
+                        <div id="lista-linhas-variacao" class="space-y-3"></div>
+                        <p class="text-[11px] text-blue-800/70">Cada sabor tem estoque, preço e imagem próprios — como se fosse um produto individual.</p>
+                    </div>
+
                     <div class="md:col-span-3 flex flex-col sm:flex-row gap-2 pt-2">
-                        <button type="submit" class="bg-green-600 text-white px-5 py-2.5 rounded-xl hover:bg-green-700 font-bold transition text-sm shadow-sm">Salvar Produto</button>
+                        <button type="submit" id="btn-salvar-produto" class="bg-green-600 text-white px-5 py-2.5 rounded-xl hover:bg-green-700 font-bold transition text-sm shadow-sm">Salvar Produto</button>
                         <button type="button" id="btn-cancelar" onclick="limparFormulario()" class="hidden bg-gray-500 text-white px-5 py-2.5 rounded-xl hover:bg-gray-600 font-semibold transition text-sm">Cancelar</button>
                     </div>
                 </form>
@@ -158,6 +178,89 @@
             return fetch(url, { ...options, headers });
         }
         let produtosCache = [];
+        let tipoCadastro = 'unico'; // 'unico' | 'variacoes'
+        let contadorLinhaVariacao = 0;
+
+        // ==========================================
+        // CADASTRO AGRUPADO (PRODUTO + VARIAÇÕES/SABORES)
+        // ==========================================
+
+        function alternarTipoCadastro(tipo) {
+            tipoCadastro = tipo;
+
+            const btnUnico = document.getElementById('btn-tipo-unico');
+            const btnVariacoes = document.getElementById('btn-tipo-variacoes');
+            const camposUnico = document.getElementById('campos-produto-unico');
+            const blocoVariacoes = document.getElementById('bloco-variacoes');
+            const camposUnicoInputs = camposUnico.querySelectorAll('input, select');
+
+            if (tipo === 'unico') {
+                btnUnico.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                btnUnico.classList.remove('bg-white', 'text-blue-700', 'border-blue-200');
+                btnVariacoes.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                btnVariacoes.classList.add('bg-white', 'text-blue-700', 'border-blue-200');
+
+                camposUnico.classList.remove('hidden');
+                blocoVariacoes.classList.add('hidden');
+
+                camposUnicoInputs.forEach(el => {
+                    if (el.id === 'preco' || el.id === 'preco_custo' || el.id === 'estoque' || el.id === 'imagem') {
+                        el.setAttribute('required', 'required');
+                    }
+                });
+            } else {
+                btnVariacoes.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                btnVariacoes.classList.remove('bg-white', 'text-blue-700', 'border-blue-200');
+                btnUnico.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                btnUnico.classList.add('bg-white', 'text-blue-700', 'border-blue-200');
+
+                camposUnico.classList.add('hidden');
+                blocoVariacoes.classList.remove('hidden');
+
+                camposUnicoInputs.forEach(el => el.removeAttribute('required'));
+
+                if (document.getElementById('lista-linhas-variacao').children.length === 0) {
+                    adicionarLinhaVariacao();
+                    adicionarLinhaVariacao();
+                }
+            }
+        }
+
+        function adicionarLinhaVariacao(valores = {}) {
+            contadorLinhaVariacao++;
+            const linhaId = `linha-variacao-${contadorLinhaVariacao}`;
+
+            const div = document.createElement('div');
+            div.id = linhaId;
+            div.className = 'grid grid-cols-2 md:grid-cols-6 gap-2 bg-white border border-blue-100 rounded-lg p-3';
+            div.innerHTML = `
+                <input type="text" placeholder="Sabor (ex: Melancia)" data-campo="sabor" value="${valores.sabor || ''}" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                <input type="number" step="0.01" placeholder="Preço (R$)" data-campo="preco" value="${valores.preco || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                <input type="number" placeholder="Estoque" data-campo="estoque" value="${valores.estoque || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                <input type="text" placeholder="URL da imagem" data-campo="imagem" value="${valores.imagem || ''}" class="col-span-2 md:col-span-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                <button type="button" onclick="document.getElementById('${linhaId}').remove()" class="bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold py-1.5">Remover</button>
+            `;
+
+            document.getElementById('lista-linhas-variacao').appendChild(div);
+        }
+
+        function lerLinhasVariacao() {
+            const linhas = document.querySelectorAll('#lista-linhas-variacao > div');
+            const variacoes = [];
+
+            linhas.forEach(linha => {
+                const sabor = linha.querySelector('[data-campo="sabor"]').value.trim();
+                const preco = parseFloat(linha.querySelector('[data-campo="preco"]').value);
+                const estoque = parseInt(linha.querySelector('[data-campo="estoque"]').value) || 0;
+                const imagem = linha.querySelector('[data-campo="imagem"]').value.trim() || null;
+
+                if (sabor && !isNaN(preco)) {
+                    variacoes.push({ sabor, preco, estoque, imagem, status: 'disponivel' });
+                }
+            });
+
+            return variacoes;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             if (sessionStorage.getItem('admin_logado') === 'true') {
@@ -232,30 +335,248 @@
                         ? '<span class="bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">🧊 Gelo Especial</span>'
                         : '<span class="text-gray-400 text-xs">-</span>';
 
-                    tbody.innerHTML += `
-                        <tr class="border-b hover:bg-gray-50/50">
-                            <td class="p-3 font-medium text-gray-900">${p.nome}</td>
-                            <td class="p-3 font-semibold">R$ ${Number(p.preco || 0).toFixed(2).replace('.', ',')}</td>
-                            <td class="p-3 text-blue-600 font-semibold">R$ ${Number(p.preco_atacado || 0).toFixed(2).replace('.', ',')}</td>
-                            <td class="p-3">${badgeGelo}</td>
-                            <td class="p-3">${p.estoque}</td>
-                            <td class="p-3">${p.status}</td>
-                            <td class="p-3 text-right space-x-2 whitespace-nowrap">
-                                <button onclick="editarProduto(${p.id})" class="text-blue-600 hover:underline font-semibold">Editar</button>
-                                <button onclick="excluirProduto(${p.id})" class="text-red-600 hover:underline font-semibold">Excluir</button>
-                            </td>
-                        </tr>
-                    `;
+                    const temVariacoes = p.possui_variacoes && Array.isArray(p.variacoes) && p.variacoes.length > 0;
+
+                    if (temVariacoes) {
+                        const estoqueTotal = p.variacoes.reduce((soma, v) => soma + Number(v.estoque || 0), 0);
+                        const precoMin = Math.min(...p.variacoes.map(v => Number(v.preco)));
+                        const precoMax = Math.max(...p.variacoes.map(v => Number(v.preco)));
+                        const faixaPreco = precoMin === precoMax
+                            ? `R$ ${precoMin.toFixed(2).replace('.', ',')}`
+                            : `R$ ${precoMin.toFixed(2).replace('.', ',')} - R$ ${precoMax.toFixed(2).replace('.', ',')}`;
+
+                        tbody.innerHTML += `
+                            <tr class="border-b hover:bg-gray-50/50 bg-blue-50/30">
+                                <td class="p-3 font-medium text-gray-900">
+                                    ${p.nome}
+                                    <span class="ml-2 bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">${p.variacoes.length} sabor(es)</span>
+                                </td>
+                                <td class="p-3 font-semibold">${faixaPreco}</td>
+                                <td class="p-3 text-blue-600 font-semibold">-</td>
+                                <td class="p-3">${badgeGelo}</td>
+                                <td class="p-3">${estoqueTotal} (total)</td>
+                                <td class="p-3">-</td>
+                                <td class="p-3 text-right space-x-2 whitespace-nowrap">
+                                    <button onclick="alternarSabores(${p.id})" class="text-blue-600 hover:underline font-semibold">Ver sabores</button>
+                                    <button onclick="excluirProduto(${p.id})" class="text-red-600 hover:underline font-semibold">Excluir</button>
+                                </td>
+                            </tr>
+                            <tr id="linha-sabores-${p.id}" class="hidden border-b">
+                                <td colspan="7" class="p-3 bg-gray-50">
+                                    <div id="conteudo-sabores-${p.id}"></div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        tbody.innerHTML += `
+                            <tr class="border-b hover:bg-gray-50/50">
+                                <td class="p-3 font-medium text-gray-900">${p.nome}</td>
+                                <td class="p-3 font-semibold">R$ ${Number(p.preco || 0).toFixed(2).replace('.', ',')}</td>
+                                <td class="p-3 text-blue-600 font-semibold">R$ ${Number(p.preco_atacado || 0).toFixed(2).replace('.', ',')}</td>
+                                <td class="p-3">${badgeGelo}</td>
+                                <td class="p-3">${p.estoque}</td>
+                                <td class="p-3">${p.status}</td>
+                                <td class="p-3 text-right space-x-2 whitespace-nowrap">
+                                    <button onclick="editarProduto(${p.id})" class="text-blue-600 hover:underline font-semibold">Editar</button>
+                                    <button onclick="excluirProduto(${p.id})" class="text-red-600 hover:underline font-semibold">Excluir</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
                 });
             } catch (err) {
                 console.error('Erro ao carregar produtos:', err);
             }
         }
 
+        // ==========================================
+        // GESTÃO DE SABORES (VARIAÇÕES) NO ADMIN
+        // ==========================================
+
+        function alternarSabores(produtoId) {
+            const linha = document.getElementById(`linha-sabores-${produtoId}`);
+            const estaAberta = !linha.classList.contains('hidden');
+
+            if (estaAberta) {
+                linha.classList.add('hidden');
+                return;
+            }
+
+            linha.classList.remove('hidden');
+            renderizarSabores(produtoId);
+        }
+
+        function renderizarSabores(produtoId) {
+            const p = produtosCache.find(prod => prod.id === produtoId);
+            if (!p) return;
+
+            const container = document.getElementById(`conteudo-sabores-${produtoId}`);
+
+            const linhasHtml = p.variacoes.map(v => `
+                <div class="grid grid-cols-2 md:grid-cols-6 gap-2 bg-white border border-gray-200 rounded-lg p-3 items-center" id="variacao-${v.id}">
+                    <input type="text" value="${v.sabor}" data-campo="sabor" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" value="${v.preco}" data-campo="preco" placeholder="Preço" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" value="${v.estoque}" data-campo="estoque" placeholder="Estoque" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="text" value="${v.imagem || ''}" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <div class="flex gap-1">
+                        <button onclick="salvarVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-green-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-green-700">Salvar</button>
+                        <button onclick="excluirVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-red-50 text-red-600 text-xs font-bold rounded-lg py-1.5 hover:bg-red-100">Excluir</button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="space-y-2 mb-3">${linhasHtml}</div>
+                <div class="grid grid-cols-2 md:grid-cols-6 gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 items-center" id="nova-variacao-${produtoId}">
+                    <input type="text" data-campo="sabor" placeholder="Novo sabor" class="col-span-2 md:col-span-2 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" data-campo="preco" placeholder="Preço" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" data-campo="estoque" placeholder="Estoque" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="text" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-1 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    <button onclick="adicionarSaborExistente(${produtoId})" class="bg-blue-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-blue-700">+ Adicionar sabor</button>
+                </div>
+            `;
+        }
+
+        async function salvarVariacaoInline(produtoId, variacaoId) {
+            const linha = document.getElementById(`variacao-${variacaoId}`);
+            const dados = {
+                sabor: linha.querySelector('[data-campo="sabor"]').value,
+                preco: parseFloat(linha.querySelector('[data-campo="preco"]').value) || 0,
+                estoque: parseInt(linha.querySelector('[data-campo="estoque"]').value) || 0,
+                imagem: linha.querySelector('[data-campo="imagem"]').value || null,
+                status: 'disponivel'
+            };
+
+            try {
+                const res = await apiFetch(`${API_URL}/produto-variacoes/${variacaoId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const resultado = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    await carregarProdutos();
+                    document.getElementById(`linha-sabores-${produtoId}`).classList.remove('hidden');
+                    renderizarSabores(produtoId);
+                } else {
+                    alert('Erro ao salvar sabor: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao salvar variação:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        async function excluirVariacaoInline(produtoId, variacaoId) {
+            if (!confirm('Deseja realmente excluir este sabor?')) return;
+
+            try {
+                const res = await apiFetch(`${API_URL}/produto-variacoes/${variacaoId}`, { method: 'DELETE' });
+
+                if (res.ok) {
+                    await carregarProdutos();
+                    document.getElementById(`linha-sabores-${produtoId}`).classList.remove('hidden');
+                    renderizarSabores(produtoId);
+                } else {
+                    const resultado = await res.json().catch(() => ({}));
+                    alert('Erro ao excluir sabor: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao excluir variação:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        async function adicionarSaborExistente(produtoId) {
+            const bloco = document.getElementById(`nova-variacao-${produtoId}`);
+            const dados = {
+                sabor: bloco.querySelector('[data-campo="sabor"]').value,
+                preco: parseFloat(bloco.querySelector('[data-campo="preco"]').value) || 0,
+                estoque: parseInt(bloco.querySelector('[data-campo="estoque"]').value) || 0,
+                imagem: bloco.querySelector('[data-campo="imagem"]').value || null,
+                status: 'disponivel'
+            };
+
+            if (!dados.sabor.trim()) {
+                alert('Informe o nome do sabor.');
+                return;
+            }
+
+            try {
+                const res = await apiFetch(`${API_URL}/produtos/${produtoId}/variacoes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const resultado = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    await carregarProdutos();
+                    document.getElementById(`linha-sabores-${produtoId}`).classList.remove('hidden');
+                    renderizarSabores(produtoId);
+                } else {
+                    alert('Erro ao adicionar sabor: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao adicionar variação:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
         async function salvarProduto(e) {
             e.preventDefault();
             const id = document.getElementById('produto-id').value;
-            
+
+            // Modo "Produto com Variações": só usado no cadastro (não na edição)
+            if (tipoCadastro === 'variacoes' && !id) {
+                const variacoes = lerLinhasVariacao();
+
+                if (variacoes.length === 0) {
+                    alert('Adicione ao menos um sabor com nome e preço válidos.');
+                    return;
+                }
+
+                const dadosAgrupado = {
+                    nome: document.getElementById('nome').value,
+                    marca: document.getElementById('marca').value || null,
+                    volume: document.getElementById('volume').value || null,
+                    teor_alcoolico: parseFloat(document.getElementById('teor_alcoolico').value) || null,
+                    descricao: document.getElementById('descricao').value || null,
+                    destaque: document.getElementById('destaque').checked ? 1 : 0,
+                    eh_gelo_especial: document.getElementById('eh_gelo_especial').checked ? 1 : 0,
+                    categoria_id: 1,
+                    variacoes
+                };
+
+                try {
+                    const res = await apiFetch(`${API_URL}/produtos/agrupado`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dadosAgrupado)
+                    });
+
+                    const respostaJson = await res.json().catch(() => ({}));
+
+                    if (res.ok) {
+                        alert(respostaJson.mensagem || 'Produto com variações cadastrado com sucesso!');
+                        limparFormulario();
+                        carregarProdutos();
+                        carregarRelatorioSemanal();
+                    } else {
+                        alert('Erro ao cadastrar produto: ' + (respostaJson.erro || 'Erro desconhecido no servidor'));
+                    }
+                } catch (err) {
+                    console.error('Erro de conexão:', err);
+                    alert('Não foi possível conectar ao servidor. Verifique se o Node.js está rodando.');
+                }
+
+                return;
+            }
+
+            // Modo "Produto Único" (cadastro ou edição de produto sem variações)
             const dados = {
                 nome: document.getElementById('nome').value,
                 marca: document.getElementById('marca').value || null,
@@ -265,7 +586,6 @@
                 estoque: parseInt(document.getElementById('estoque').value) || 0,
                 volume: document.getElementById('volume').value || null,
                 teor_alcoolico: parseFloat(document.getElementById('teor_alcoolico').value) || 0,
-                sabores: document.getElementById('sabores').value || null,
                 imagem: document.getElementById('imagem').value,
                 status: document.getElementById('status').value,
                 destaque: document.getElementById('destaque').checked ? 1 : 0,
@@ -304,6 +624,14 @@
             const p = produtosCache.find(prod => prod.id === id);
             if (!p) return;
 
+            if (p.possui_variacoes) {
+                alert('Este produto tem variações (sabores). Edite nome/marca ou gerencie cada sabor diretamente na tabela abaixo, em "Ver sabores".');
+                return;
+            }
+
+            alternarTipoCadastro('unico');
+            document.getElementById('seletor-tipo-cadastro').classList.add('hidden');
+
             document.getElementById('produto-id').value = p.id;
             document.getElementById('nome').value = p.nome;
             document.getElementById('marca').value = p.marca || '';
@@ -313,7 +641,6 @@
             document.getElementById('estoque').value = p.estoque;
             document.getElementById('volume').value = p.volume || '';
             document.getElementById('teor_alcoolico').value = p.teor_alcoolico || '';
-            document.getElementById('sabores').value = p.sabores || '';
             document.getElementById('imagem').value = p.imagem;
             document.getElementById('status').value = p.status;
             document.getElementById('destaque').checked = (p.destaque === 1 || p.destaque === true);
@@ -328,8 +655,11 @@
         function limparFormulario() {
             document.getElementById('form-produto').reset();
             document.getElementById('produto-id').value = '';
+            document.getElementById('lista-linhas-variacao').innerHTML = '';
             document.getElementById('titulo-form').textContent = 'Cadastrar Produto';
             document.getElementById('btn-cancelar').classList.add('hidden');
+            document.getElementById('seletor-tipo-cadastro').classList.remove('hidden');
+            alternarTipoCadastro('unico');
         }
 
         async function excluirProduto(id) {
