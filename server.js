@@ -11,6 +11,11 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
+
+// ============================================================
+// BANCO DE DADOS
+// ============================================================
+
 const dbConfig = {
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
@@ -26,9 +31,9 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 
-// ==========================================
+// ============================================================
 // AUTENTICAÇÃO ADMIN
-// ==========================================
+// ============================================================
 
 function criarTokenAdmin() {
     const payload = Buffer.from(
@@ -46,19 +51,23 @@ function criarTokenAdmin() {
     return `${payload}.${assinatura}`;
 }
 
+
 function autenticarAdmin(req, res, next) {
     const header = req.headers.authorization || '';
+
     const token = header.startsWith('Bearer ')
         ? header.slice(7)
         : '';
 
-    const [payload, assinatura] = token.split('.');
+    const partes = token.split('.');
 
-    if (!payload || !assinatura || !ADMIN_SECRET) {
+    if (partes.length !== 2 || !ADMIN_SECRET) {
         return res.status(401).json({
             erro: 'Não autorizado.'
         });
     }
+
+    const [payload, assinatura] = partes;
 
     const assinaturaEsperada = crypto
         .createHmac('sha256', ADMIN_SECRET)
@@ -90,6 +99,7 @@ function autenticarAdmin(req, res, next) {
                 erro: 'Sessão expirada.'
             });
         }
+
     } catch {
         return res.status(401).json({
             erro: 'Token inválido.'
@@ -99,7 +109,13 @@ function autenticarAdmin(req, res, next) {
     next();
 }
 
+
+// ============================================================
+// LOGIN
+// ============================================================
+
 app.post('/admin/login', (req, res) => {
+
     const { senha } = req.body || {};
 
     if (!ADMIN_PASSWORD || senha !== ADMIN_PASSWORD) {
@@ -114,41 +130,89 @@ app.post('/admin/login', (req, res) => {
 });
 
 
-// ==========================================
-// ROTAS DE PRODUTOS
-// ==========================================
+// ============================================================
+// CATEGORIAS
+// ============================================================
 
-app.get('/produtos', async (req, res) => {
+app.get('/categorias', async (req, res) => {
+
     let connection;
 
     try {
+
         connection = await mysql.createConnection(dbConfig);
 
         const [rows] = await connection.execute(`
             SELECT
                 id,
                 nome,
-                categoria_id,
-                marca,
-                preco,
-                preco_atacado,
-                preco_custo,
-                volume,
-                teor_alcoolico,
-                estoque,
-                imagem,
-                descricao,
-                status,
-                destaque,
-                sabores,
-                grupo_sabores,
-                eh_gelo_especial
-            FROM produtos
+                slug
+            FROM categorias
+            ORDER BY nome ASC
         `);
 
         res.json(rows);
 
     } catch (erro) {
+
+        console.error('Erro ao buscar categorias:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar categorias.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// PRODUTOS
+// ============================================================
+
+app.get('/produtos', async (req, res) => {
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        const [rows] = await connection.execute(`
+            SELECT
+                p.id,
+                p.categoria_id,
+                c.nome AS categoria,
+                p.nome,
+                p.descricao,
+                p.marca,
+                p.volume,
+                p.teor_alcoolico,
+                p.preco,
+                p.preco_promocional,
+                p.preco_custo,
+                p.preco_atacado,
+                p.estoque,
+                p.status,
+                p.imagem,
+                p.destaque,
+                p.eh_gelo_especial,
+                p.preco_especial,
+                p.criado_em
+            FROM produtos p
+            LEFT JOIN categorias c
+                ON p.categoria_id = c.id
+            ORDER BY p.id DESC
+        `);
+
+        res.json(rows);
+
+    } catch (erro) {
+
         console.error('Erro ao buscar produtos:', erro);
 
         res.status(500).json({
@@ -156,6 +220,7 @@ app.get('/produtos', async (req, res) => {
         });
 
     } finally {
+
         if (connection) {
             await connection.end();
         }
@@ -163,49 +228,58 @@ app.get('/produtos', async (req, res) => {
 });
 
 
+// ============================================================
+// PRODUTOS EM DESTAQUE
+// ============================================================
+
 app.get('/produtos-destaque', async (req, res) => {
+
     let connection;
 
     try {
+
         connection = await mysql.createConnection(dbConfig);
 
         const [rows] = await connection.execute(`
             SELECT
-                id,
-                nome,
-                categoria_id,
-                marca,
-                preco,
-                preco_atacado,
-                preco_custo,
-                volume,
-                teor_alcoolico,
-                estoque,
-                imagem,
-                descricao,
-                status,
-                destaque,
-                sabores,
-                grupo_sabores,
-                eh_gelo_especial
-            FROM produtos
-            WHERE destaque = 1
+                p.id,
+                p.categoria_id,
+                c.nome AS categoria,
+                p.nome,
+                p.descricao,
+                p.marca,
+                p.volume,
+                p.teor_alcoolico,
+                p.preco,
+                p.preco_promocional,
+                p.preco_custo,
+                p.preco_atacado,
+                p.estoque,
+                p.status,
+                p.imagem,
+                p.destaque,
+                p.eh_gelo_especial,
+                p.preco_especial
+            FROM produtos p
+            LEFT JOIN categorias c
+                ON p.categoria_id = c.id
+            WHERE p.destaque = 1
+            ORDER BY p.id DESC
             LIMIT 2
         `);
 
         res.json(rows);
 
     } catch (erro) {
-        console.error(
-            'Erro ao buscar produtos em destaque:',
-            erro
-        );
+
+        console.error('Erro ao buscar destaques:', erro);
 
         res.status(500).json({
-            erro: 'Erro interno ao buscar destaques.'
+            erro: 'Erro ao buscar destaques.'
         });
 
     } finally {
+
         if (connection) {
             await connection.end();
         }
@@ -213,106 +287,100 @@ app.get('/produtos-destaque', async (req, res) => {
 });
 
 
-// ==========================================
+// ============================================================
 // CADASTRAR PRODUTO
-// ==========================================
+// ============================================================
 
 app.post('/produtos', autenticarAdmin, async (req, res) => {
 
     const {
-        nome,
         categoria_id,
+        nome,
+        descricao,
         marca,
-        preco,
-        preco_atacado,
-        preco_custo,
         volume,
         teor_alcoolico,
+        preco,
+        preco_promocional,
+        preco_custo,
+        preco_atacado,
         estoque,
-        imagem,
-        descricao,
         status,
+        imagem,
         destaque,
-
-        // Sistema antigo de sabores
-        sabores,
-
-        // Novo sistema
-        grupo_sabores,
-
-        eh_gelo_especial
+        eh_gelo_especial,
+        preco_especial
     } = req.body;
 
-    const isDestaque = destaque ? 1 : 0;
-    const isGeloEspecial = eh_gelo_especial ? 1 : 0;
+    if (!nome || preco === undefined) {
+        return res.status(400).json({
+            erro: 'Nome e preço são obrigatórios.'
+        });
+    }
 
     let connection;
 
     try {
+
         connection = await mysql.createConnection(dbConfig);
 
-        const query = `
+        const [resultado] = await connection.execute(`
             INSERT INTO produtos (
-                nome,
                 categoria_id,
+                nome,
+                descricao,
                 marca,
-                preco,
-                preco_atacado,
-                preco_custo,
                 volume,
                 teor_alcoolico,
+                preco,
+                preco_promocional,
+                preco_custo,
+                preco_atacado,
                 estoque,
-                imagem,
-                descricao,
                 status,
+                imagem,
                 destaque,
-                sabores,
-                grupo_sabores,
-                eh_gelo_especial
+                eh_gelo_especial,
+                preco_especial
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        await connection.execute(query, [
-            nome,
+        `, [
             categoria_id || 1,
-            marca,
-            preco,
-            preco_atacado || 0,
-            preco_custo || 0,
-            volume,
-            teor_alcoolico,
-            estoque,
-            imagem,
-            descricao,
+            nome,
+            descricao || null,
+            marca || null,
+            volume || null,
+            Number(teor_alcoolico) || 0,
+            Number(preco) || 0,
+            preco_promocional !== undefined && preco_promocional !== null && preco_promocional !== ''
+                ? Number(preco_promocional)
+                : null,
+            Number(preco_custo) || 0,
+            Number(preco_atacado) || 0,
+            Number(estoque) || 0,
             status || 'disponivel',
-            isDestaque,
-
-            // Mantém compatibilidade com produtos antigos
-            sabores || null,
-
-            // Novo grupo
-            grupo_sabores || null,
-
-            isGeloEspecial
+            imagem || null,
+            destaque ? 1 : 0,
+            eh_gelo_especial ? 1 : 0,
+            Number(preco_especial) || 0
         ]);
 
         res.status(201).json({
             sucesso: true,
+            id: resultado.insertId,
             mensagem: 'Produto cadastrado com sucesso!'
         });
 
     } catch (erro) {
-        console.error(
-            'Erro ao cadastrar produto:',
-            erro
-        );
+
+        console.error('Erro ao cadastrar produto:', erro);
 
         res.status(500).json({
             erro: 'Erro ao cadastrar produto.'
         });
 
     } finally {
+
         if (connection) {
             await connection.end();
         }
@@ -320,87 +388,86 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
 });
 
 
-// ==========================================
+// ============================================================
 // EDITAR PRODUTO
-// ==========================================
+// ============================================================
 
 app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
 
     const { id } = req.params;
 
     const {
-        nome,
         categoria_id,
+        nome,
+        descricao,
         marca,
-        preco,
-        preco_atacado,
-        preco_custo,
         volume,
         teor_alcoolico,
+        preco,
+        preco_promocional,
+        preco_custo,
+        preco_atacado,
         estoque,
-        imagem,
-        descricao,
         status,
+        imagem,
         destaque,
-
-        // Sistema antigo
-        sabores,
-
-        // Novo sistema
-        grupo_sabores,
-
-        eh_gelo_especial
+        eh_gelo_especial,
+        preco_especial
     } = req.body;
-
-    const isDestaque = destaque ? 1 : 0;
-    const isGeloEspecial = eh_gelo_especial ? 1 : 0;
 
     let connection;
 
     try {
+
         connection = await mysql.createConnection(dbConfig);
 
-        const query = `
+        const [resultado] = await connection.execute(`
             UPDATE produtos
             SET
-                nome = ?,
                 categoria_id = ?,
+                nome = ?,
+                descricao = ?,
                 marca = ?,
-                preco = ?,
-                preco_atacado = ?,
-                preco_custo = ?,
                 volume = ?,
                 teor_alcoolico = ?,
+                preco = ?,
+                preco_promocional = ?,
+                preco_custo = ?,
+                preco_atacado = ?,
                 estoque = ?,
-                imagem = ?,
-                descricao = ?,
                 status = ?,
+                imagem = ?,
                 destaque = ?,
-                sabores = ?,
-                grupo_sabores = ?,
-                eh_gelo_especial = ?
+                eh_gelo_especial = ?,
+                preco_especial = ?
             WHERE id = ?
-        `;
-
-        await connection.execute(query, [
-            nome,
+        `, [
             categoria_id || 1,
-            marca,
-            preco,
-            preco_atacado || 0,
-            preco_custo || 0,
-            volume,
-            teor_alcoolico,
-            estoque,
-            imagem,
-            descricao,
+            nome,
+            descricao || null,
+            marca || null,
+            volume || null,
+            Number(teor_alcoolico) || 0,
+            Number(preco) || 0,
+            preco_promocional !== undefined && preco_promocional !== null && preco_promocional !== ''
+                ? Number(preco_promocional)
+                : null,
+            Number(preco_custo) || 0,
+            Number(preco_atacado) || 0,
+            Number(estoque) || 0,
             status || 'disponivel',
-            isDestaque,
-            sabores || null,
-            grupo_sabores || null,
-            isGeloEspecial,
+            imagem || null,
+            destaque ? 1 : 0,
+            eh_gelo_especial ? 1 : 0,
+            Number(preco_especial) || 0,
             id
         ]);
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Produto não encontrado.'
+            });
+        }
 
         res.json({
             sucesso: true,
@@ -408,16 +475,15 @@ app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
         });
 
     } catch (erro) {
-        console.error(
-            'Erro ao atualizar produto:',
-            erro
-        );
+
+        console.error('Erro ao atualizar produto:', erro);
 
         res.status(500).json({
             erro: 'Erro ao atualizar produto.'
         });
 
     } finally {
+
         if (connection) {
             await connection.end();
         }
@@ -425,9 +491,9 @@ app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
 });
 
 
-// ==========================================
+// ============================================================
 // EXCLUIR PRODUTO
-// ==========================================
+// ============================================================
 
 app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
 
@@ -436,12 +502,19 @@ app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
     let connection;
 
     try {
+
         connection = await mysql.createConnection(dbConfig);
 
-        await connection.execute(
+        const [resultado] = await connection.execute(
             'DELETE FROM produtos WHERE id = ?',
             [id]
         );
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Produto não encontrado.'
+            });
+        }
 
         res.json({
             sucesso: true,
@@ -449,16 +522,15 @@ app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
         });
 
     } catch (erro) {
-        console.error(
-            'Erro ao excluir produto:',
-            erro
-        );
+
+        console.error('Erro ao excluir produto:', erro);
 
         res.status(500).json({
             erro: 'Erro ao excluir produto.'
         });
 
     } finally {
+
         if (connection) {
             await connection.end();
         }
@@ -466,15 +538,456 @@ app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
 });
 
 
-// ==========================================
-// PEDIDOS
-// ==========================================
+// ============================================================
+// CATÁLOGOS DE SABORES
+// ============================================================
+
+app.get('/catalogos-sabores', async (req, res) => {
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        const [catalogos] = await connection.execute(`
+            SELECT
+                id,
+                nome,
+                marca,
+                descricao,
+                imagem,
+                criado_em
+            FROM catalogos_sabores
+            ORDER BY id DESC
+        `);
+
+        for (const catalogo of catalogos) {
+
+            const [sabores] = await connection.execute(`
+                SELECT
+                    id,
+                    catalogo_id,
+                    nome,
+                    preco,
+                    preco_custo,
+                    preco_atacado,
+                    estoque,
+                    status,
+                    imagem,
+                    descricao,
+                    criado_em
+                FROM sabores
+                WHERE catalogo_id = ?
+                ORDER BY id ASC
+            `, [catalogo.id]);
+
+            catalogo.sabores = sabores;
+        }
+
+        res.json(catalogos);
+
+    } catch (erro) {
+
+        console.error('Erro ao buscar catálogos:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar catálogos de sabores.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// CADASTRAR CATÁLOGO DE SABORES
+// ============================================================
+
+app.post('/catalogos-sabores', autenticarAdmin, async (req, res) => {
+
+    const {
+        nome,
+        marca,
+        descricao,
+        imagem
+    } = req.body;
+
+    if (!nome) {
+        return res.status(400).json({
+            erro: 'O nome do catálogo é obrigatório.'
+        });
+    }
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        const [resultado] = await connection.execute(`
+            INSERT INTO catalogos_sabores (
+                nome,
+                marca,
+                descricao,
+                imagem
+            )
+            VALUES (?, ?, ?, ?)
+        `, [
+            nome,
+            marca || null,
+            descricao || null,
+            imagem || null
+        ]);
+
+        res.status(201).json({
+            sucesso: true,
+            id: resultado.insertId,
+            mensagem: 'Catálogo criado com sucesso!'
+        });
+
+    } catch (erro) {
+
+        console.error('Erro ao criar catálogo:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao criar catálogo.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// EDITAR CATÁLOGO
+// ============================================================
+
+app.put('/catalogos-sabores/:id', autenticarAdmin, async (req, res) => {
+
+    const { id } = req.params;
+
+    const {
+        nome,
+        marca,
+        descricao,
+        imagem
+    } = req.body;
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        const [resultado] = await connection.execute(`
+            UPDATE catalogos_sabores
+            SET
+                nome = ?,
+                marca = ?,
+                descricao = ?,
+                imagem = ?
+            WHERE id = ?
+        `, [
+            nome,
+            marca || null,
+            descricao || null,
+            imagem || null,
+            id
+        ]);
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Catálogo não encontrado.'
+            });
+        }
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Catálogo atualizado com sucesso!'
+        });
+
+    } catch (erro) {
+
+        console.error('Erro ao atualizar catálogo:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar catálogo.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// EXCLUIR CATÁLOGO
+// ============================================================
+
+app.delete('/catalogos-sabores/:id', autenticarAdmin, async (req, res) => {
+
+    const { id } = req.params;
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        await connection.execute(
+            'DELETE FROM catalogos_sabores WHERE id = ?',
+            [id]
+        );
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Catálogo excluído com sucesso!'
+        });
+
+    } catch (erro) {
+
+        console.error('Erro ao excluir catálogo:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir catálogo.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// SABORES
+// ============================================================
+
+app.post('/sabores', autenticarAdmin, async (req, res) => {
+
+    const {
+        catalogo_id,
+        nome,
+        preco,
+        preco_custo,
+        preco_atacado,
+        estoque,
+        status,
+        imagem,
+        descricao
+    } = req.body;
+
+    if (!catalogo_id || !nome) {
+        return res.status(400).json({
+            erro: 'Catálogo e nome do sabor são obrigatórios.'
+        });
+    }
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        const [resultado] = await connection.execute(`
+            INSERT INTO sabores (
+                catalogo_id,
+                nome,
+                preco,
+                preco_custo,
+                preco_atacado,
+                estoque,
+                status,
+                imagem,
+                descricao
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            catalogo_id,
+            nome,
+            Number(preco) || 0,
+            Number(preco_custo) || 0,
+            Number(preco_atacado) || 0,
+            Number(estoque) || 0,
+            status || 'disponivel',
+            imagem || null,
+            descricao || null
+        ]);
+
+        res.status(201).json({
+            sucesso: true,
+            id: resultado.insertId,
+            mensagem: 'Sabor cadastrado com sucesso!'
+        });
+
+    } catch (erro) {
+
+        console.error('Erro ao cadastrar sabor:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao cadastrar sabor.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// EDITAR SABOR
+// ============================================================
+
+app.put('/sabores/:id', autenticarAdmin, async (req, res) => {
+
+    const { id } = req.params;
+
+    const {
+        catalogo_id,
+        nome,
+        preco,
+        preco_custo,
+        preco_atacado,
+        estoque,
+        status,
+        imagem,
+        descricao
+    } = req.body;
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        const [resultado] = await connection.execute(`
+            UPDATE sabores
+            SET
+                catalogo_id = ?,
+                nome = ?,
+                preco = ?,
+                preco_custo = ?,
+                preco_atacado = ?,
+                estoque = ?,
+                status = ?,
+                imagem = ?,
+                descricao = ?
+            WHERE id = ?
+        `, [
+            catalogo_id,
+            nome,
+            Number(preco) || 0,
+            Number(preco_custo) || 0,
+            Number(preco_atacado) || 0,
+            Number(estoque) || 0,
+            status || 'disponivel',
+            imagem || null,
+            descricao || null,
+            id
+        ]);
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Sabor não encontrado.'
+            });
+        }
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Sabor atualizado com sucesso!'
+        });
+
+    } catch (erro) {
+
+        console.error('Erro ao atualizar sabor:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar sabor.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// EXCLUIR SABOR
+// ============================================================
+
+app.delete('/sabores/:id', autenticarAdmin, async (req, res) => {
+
+    const { id } = req.params;
+
+    let connection;
+
+    try {
+
+        connection = await mysql.createConnection(dbConfig);
+
+        const [resultado] = await connection.execute(
+            'DELETE FROM sabores WHERE id = ?',
+            [id]
+        );
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Sabor não encontrado.'
+            });
+        }
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Sabor excluído com sucesso!'
+        });
+
+    } catch (erro) {
+
+        console.error('Erro ao excluir sabor:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir sabor.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
+// PEDIDOS - LISTAR
+// ============================================================
 
 app.get('/pedidos', autenticarAdmin, async (req, res) => {
 
     let connection;
 
     try {
+
         connection = await mysql.createConnection(dbConfig);
 
         const [pedidos] = await connection.execute(`
@@ -484,47 +997,58 @@ app.get('/pedidos', autenticarAdmin, async (req, res) => {
                 telefone,
                 endereco,
                 valor_total,
-                status
+                status,
+                data_criacao
             FROM pedidos
             ORDER BY id DESC
         `);
 
-        const pedidosComItens = [];
-
-        for (let ped of pedidos) {
+        for (const pedido of pedidos) {
 
             const [itens] = await connection.execute(`
                 SELECT
+                    ip.id,
+                    ip.produto_id,
+                    ip.sabor_id,
                     ip.quantidade,
-                    ip.preco AS preco,
-                    p.nome,
-                    p.sabores,
-                    p.grupo_sabores
-                FROM itens_pedido ip
-                INNER JOIN produtos p
-                    ON ip.produto_id = p.id
-                WHERE ip.pedido_id = ?
-            `, [ped.id]);
+                    ip.preco,
 
-            pedidosComItens.push({
-                ...ped,
-                itens
-            });
+                    p.nome AS produto_nome,
+
+                    s.nome AS sabor_nome,
+                    c.nome AS catalogo_nome
+
+                FROM itens_pedido ip
+
+                LEFT JOIN produtos p
+                    ON ip.produto_id = p.id
+
+                LEFT JOIN sabores s
+                    ON ip.sabor_id = s.id
+
+                LEFT JOIN catalogos_sabores c
+                    ON s.catalogo_id = c.id
+
+                WHERE ip.pedido_id = ?
+
+                ORDER BY ip.id ASC
+            `, [pedido.id]);
+
+            pedido.itens = itens;
         }
 
-        res.json(pedidosComItens);
+        res.json(pedidos);
 
     } catch (erro) {
-        console.error(
-            'Erro ao buscar pedidos:',
-            erro
-        );
+
+        console.error('Erro ao buscar pedidos:', erro);
 
         res.status(500).json({
-            erro: 'Erro interno ao buscar pedidos.'
+            erro: 'Erro ao buscar pedidos.'
         });
 
     } finally {
+
         if (connection) {
             await connection.end();
         }
@@ -532,9 +1056,9 @@ app.get('/pedidos', autenticarAdmin, async (req, res) => {
 });
 
 
-// ==========================================
+// ============================================================
 // CRIAR PEDIDO
-// ==========================================
+// ============================================================
 
 app.post('/pedidos', async (req, res) => {
 
@@ -545,7 +1069,17 @@ app.post('/pedidos', async (req, res) => {
         itens
     } = req.body;
 
-    if (!itens || itens.length === 0) {
+    if (
+        !nome_cliente ||
+        !telefone ||
+        !endereco
+    ) {
+        return res.status(400).json({
+            erro: 'Nome, telefone e endereço são obrigatórios.'
+        });
+    }
+
+    if (!Array.isArray(itens) || itens.length === 0) {
         return res.status(400).json({
             erro: 'O carrinho está vazio.'
         });
@@ -561,122 +1095,217 @@ app.post('/pedidos', async (req, res) => {
 
         let subtotalVarejo = 0;
 
-        const produtosDoPedido = [];
+        const produtosPedido = [];
 
-        for (let item of itens) {
+        // ======================================================
+        // VALIDAR ITENS
+        // ======================================================
 
-            const [rows] = await connection.execute(
-                `
-                SELECT
-                    id,
-                    estoque,
-                    nome,
-                    preco,
-                    preco_atacado,
-                    eh_gelo_especial
-                FROM produtos
-                WHERE id = ?
-                `,
-                [item.id]
-            );
+        for (const item of itens) {
 
-            if (rows.length === 0) {
+            const quantidade = Number(item.quantidade);
+
+            if (!quantidade || quantidade <= 0) {
                 throw new Error(
-                    `Produto ID ${item.id} não encontrado.`
+                    'Quantidade de produto inválida.'
                 );
             }
 
-            const produtoDb = rows[0];
 
-            if (produtoDb.estoque < item.quantidade) {
-                throw new Error(
-                    `Estoque insuficiente para "${produtoDb.nome}". Disponível: ${produtoDb.estoque}`
-                );
-            }
+            // ==================================================
+            // PRODUTO NORMAL
+            // ==================================================
 
-            let precoBaseItem =
-                Number(produtoDb.preco);
+            if (item.produto_id) {
 
-            // Regra do gelo especial
-            if (produtoDb.eh_gelo_especial) {
+                const [rows] = await connection.execute(`
+                    SELECT
+                        id,
+                        nome,
+                        preco,
+                        preco_atacado,
+                        estoque,
+                        eh_gelo_especial,
+                        preco_especial
+                    FROM produtos
+                    WHERE id = ?
+                    FOR UPDATE
+                `, [item.produto_id]);
 
-                const qtd =
-                    Number(item.quantidade);
-
-                if (qtd > 10) {
-
-                    precoBaseItem = 2.50;
-
-                } else {
-
-                    const pacotesDeSeis =
-                        Math.floor(qtd / 6);
-
-                    const restoUnidades =
-                        qtd % 6;
-
-                    const valorTotalLote =
-                        (pacotesDeSeis * 20.00) +
-                        (restoUnidades * 4.00);
-
-                    precoBaseItem =
-                        valorTotalLote / qtd;
+                if (rows.length === 0) {
+                    throw new Error(
+                        `Produto ID ${item.produto_id} não encontrado.`
+                    );
                 }
+
+                const produto = rows[0];
+
+                if (produto.estoque < quantidade) {
+                    throw new Error(
+                        `Estoque insuficiente para "${produto.nome}". Disponível: ${produto.estoque}`
+                    );
+                }
+
+                let precoBase = Number(produto.preco);
+
+                // ==================================================
+                // GELO ESPECIAL
+                // ==================================================
+
+                if (produto.eh_gelo_especial) {
+
+                    if (quantidade > 10) {
+
+                        precoBase = 2.50;
+
+                    } else {
+
+                        const pacotesDeSeis =
+                            Math.floor(quantidade / 6);
+
+                        const resto =
+                            quantidade % 6;
+
+                        const valorTotal =
+                            (pacotesDeSeis * 20) +
+                            (resto * 4);
+
+                        precoBase =
+                            valorTotal / quantidade;
+                    }
+                }
+
+                subtotalVarejo +=
+                    precoBase * quantidade;
+
+                produtosPedido.push({
+                    tipo: 'produto',
+
+                    id: produto.id,
+
+                    quantidade,
+
+                    preco_base: precoBase,
+
+                    preco_atacado:
+                        Number(produto.preco_atacado || 0),
+
+                    eh_gelo:
+                        Boolean(produto.eh_gelo_especial)
+                });
+
             }
 
-            subtotalVarejo +=
-                precoBaseItem * item.quantidade;
 
-            produtosDoPedido.push({
-                id: produtoDb.id,
-                quantidade: item.quantidade,
-                preco_base: precoBaseItem,
+            // ==================================================
+            // SABOR
+            // ==================================================
 
-                preco_atacado:
-                    produtoDb.preco_atacado
-                        ? Number(produtoDb.preco_atacado)
-                        : 0,
+            else if (item.sabor_id) {
 
-                eh_gelo:
-                    produtoDb.eh_gelo_especial
-            });
+                const [rows] = await connection.execute(`
+                    SELECT
+                        s.id,
+                        s.nome,
+                        s.preco,
+                        s.preco_atacado,
+                        s.estoque
+                    FROM sabores s
+                    WHERE s.id = ?
+                    FOR UPDATE
+                `, [item.sabor_id]);
+
+                if (rows.length === 0) {
+                    throw new Error(
+                        `Sabor ID ${item.sabor_id} não encontrado.`
+                    );
+                }
+
+                const sabor = rows[0];
+
+                if (sabor.estoque < quantidade) {
+                    throw new Error(
+                        `Estoque insuficiente para "${sabor.nome}". Disponível: ${sabor.estoque}`
+                    );
+                }
+
+                const precoBase =
+                    Number(sabor.preco);
+
+                subtotalVarejo +=
+                    precoBase * quantidade;
+
+                produtosPedido.push({
+                    tipo: 'sabor',
+
+                    id: sabor.id,
+
+                    quantidade,
+
+                    preco_base: precoBase,
+
+                    preco_atacado:
+                        Number(sabor.preco_atacado || 0),
+
+                    eh_gelo: false
+                });
+
+            }
+
+            else {
+
+                throw new Error(
+                    'Item do pedido não possui produto_id nem sabor_id.'
+                );
+            }
         }
+
+
+        // ======================================================
+        // ATACADO
+        // ======================================================
 
         const atingiuAtacado =
             subtotalVarejo > 250;
 
-        let novoValorTotalCalculado = 0;
 
         const itensValidados = [];
 
-        for (let prod of produtosDoPedido) {
+        let valorTotal = 0;
 
-            let precoFinalItem =
-                prod.preco_base;
+
+        for (const item of produtosPedido) {
+
+            let precoFinal =
+                item.preco_base;
 
             if (
                 atingiuAtacado &&
-                prod.preco_atacado > 0 &&
-                !prod.eh_gelo
+                item.preco_atacado > 0 &&
+                !item.eh_gelo
             ) {
-                precoFinalItem =
-                    prod.preco_atacado;
+                precoFinal =
+                    item.preco_atacado;
             }
 
             itensValidados.push({
-                id: prod.id,
-                quantidade: prod.quantidade,
-                preco: precoFinalItem
+                tipo: item.tipo,
+                id: item.id,
+                quantidade: item.quantidade,
+                preco: precoFinal
             });
 
-            novoValorTotalCalculado +=
-                precoFinalItem *
-                prod.quantidade;
+            valorTotal +=
+                precoFinal * item.quantidade;
         }
 
+
+        // ======================================================
+        // CRIAR PEDIDO
+        // ======================================================
+
         const [resultadoPedido] =
-            await connection.execute(
-                `
+            await connection.execute(`
                 INSERT INTO pedidos (
                     nome_cliente,
                     telefone,
@@ -685,47 +1314,72 @@ app.post('/pedidos', async (req, res) => {
                     status
                 )
                 VALUES (?, ?, ?, ?, ?)
-                `,
-                [
-                    nome_cliente,
-                    telefone,
-                    endereco,
-                    novoValorTotalCalculado,
-                    'pendente'
-                ]
-            );
+            `, [
+                nome_cliente,
+                telefone,
+                endereco,
+                valorTotal,
+                'pendente'
+            ]);
 
         const pedidoId =
             resultadoPedido.insertId;
 
-        for (let item of itensValidados) {
 
-            await connection.execute(
-                `
-                INSERT INTO itens_pedido (
-                    pedido_id,
-                    produto_id,
-                    quantidade,
-                    preco
-                )
-                VALUES (?, ?, ?, ?)
-                `,
-                [
+        // ======================================================
+        // INSERIR ITENS
+        // ======================================================
+
+        for (const item of itensValidados) {
+
+            if (item.tipo === 'produto') {
+
+                await connection.execute(`
+                    INSERT INTO itens_pedido (
+                        pedido_id,
+                        produto_id,
+                        sabor_id,
+                        quantidade,
+                        preco
+                    )
+                    VALUES (?, ?, NULL, ?, ?)
+                `, [
                     pedidoId,
                     item.id,
                     item.quantidade,
                     item.preco
-                ]
-            );
+                ]);
+
+            } else {
+
+                await connection.execute(`
+                    INSERT INTO itens_pedido (
+                        pedido_id,
+                        produto_id,
+                        sabor_id,
+                        quantidade,
+                        preco
+                    )
+                    VALUES (?, NULL, ?, ?, ?)
+                `, [
+                    pedidoId,
+                    item.id,
+                    item.quantidade,
+                    item.preco
+                ]);
+            }
         }
+
 
         await connection.commit();
 
         res.status(201).json({
             sucesso: true,
             mensagem: 'Pedido realizado com sucesso!',
-            chave_pix:
-                'masterdistribuidoracm@gmail.com'
+            pedido_id: pedidoId,
+            valor_total: valorTotal,
+            atacado: atingiuAtacado,
+            chave_pix: 'masterdistribuidoracm@gmail.com'
         });
 
     } catch (erro) {
@@ -736,10 +1390,7 @@ app.post('/pedidos', async (req, res) => {
             } catch {}
         }
 
-        console.error(
-            'Erro ao processar pedido:',
-            erro
-        );
+        console.error('Erro ao processar pedido:', erro);
 
         res.status(400).json({
             erro:
@@ -756,302 +1407,412 @@ app.post('/pedidos', async (req, res) => {
 });
 
 
-// ==========================================
+// ============================================================
 // ALTERAR STATUS DO PEDIDO
-// ==========================================
+// ============================================================
 
-app.put(
-    '/pedidos/:id/status',
-    autenticarAdmin,
-    async (req, res) => {
+app.put('/pedidos/:id/status', autenticarAdmin, async (req, res) => {
 
-        const { id } = req.params;
-        const { status } = req.body;
+    const { id } = req.params;
+    const { status } = req.body;
 
-        let connection;
+    const statusValidos = [
+        'pendente',
+        'pago',
+        'enviado',
+        'entregue',
+        'cancelado'
+    ];
 
-        try {
+    if (!statusValidos.includes(status)) {
+        return res.status(400).json({
+            erro: 'Status inválido.'
+        });
+    }
 
-            connection =
-                await mysql.createConnection(dbConfig);
+    let connection;
 
-            await connection.beginTransaction();
+    try {
 
-            const [pedidoRows] =
-                await connection.execute(
-                    'SELECT status FROM pedidos WHERE id = ?',
-                    [id]
-                );
+        connection = await mysql.createConnection(dbConfig);
 
-            if (pedidoRows.length === 0) {
-                throw new Error(
-                    'Pedido não encontrado.'
-                );
-            }
+        await connection.beginTransaction();
 
-            const statusAnterior =
-                pedidoRows[0].status;
+        const [pedidoRows] = await connection.execute(`
+            SELECT status
+            FROM pedidos
+            WHERE id = ?
+            FOR UPDATE
+        `, [id]);
 
-            await connection.execute(
-                'UPDATE pedidos SET status = ? WHERE id = ?',
-                [status, id]
+        if (pedidoRows.length === 0) {
+            throw new Error(
+                'Pedido não encontrado.'
             );
+        }
 
-            // Pedido pago: desconta estoque
-            if (
-                status === 'pago' &&
-                statusAnterior !== 'pago'
-            ) {
+        const statusAnterior =
+            pedidoRows[0].status;
 
-                const [itens] =
-                    await connection.execute(
-                        `
-                        SELECT
-                            produto_id,
-                            quantidade
-                        FROM itens_pedido
-                        WHERE pedido_id = ?
-                        `,
-                        [id]
-                    );
 
-                for (let item of itens) {
+        // ======================================================
+        // PAGAMENTO
+        // ======================================================
 
-                    await connection.execute(
-                        `
-                        UPDATE produtos
-                        SET estoque = estoque - ?
-                        WHERE id = ?
-                        `,
-                        [
+        if (
+            status === 'pago' &&
+            statusAnterior !== 'pago'
+        ) {
+
+            const [itens] = await connection.execute(`
+                SELECT
+                    produto_id,
+                    sabor_id,
+                    quantidade
+                FROM itens_pedido
+                WHERE pedido_id = ?
+            `, [id]);
+
+
+            for (const item of itens) {
+
+                if (item.produto_id) {
+
+                    const [resultado] =
+                        await connection.execute(`
+                            UPDATE produtos
+                            SET estoque = estoque - ?
+                            WHERE id = ?
+                            AND estoque >= ?
+                        `, [
                             item.quantidade,
-                            item.produto_id
-                        ]
-                    );
+                            item.produto_id,
+                            item.quantidade
+                        ]);
+
+                    if (resultado.affectedRows === 0) {
+                        throw new Error(
+                            'Estoque insuficiente para um dos produtos do pedido.'
+                        );
+                    }
+
+                } else if (item.sabor_id) {
+
+                    const [resultado] =
+                        await connection.execute(`
+                            UPDATE sabores
+                            SET estoque = estoque - ?
+                            WHERE id = ?
+                            AND estoque >= ?
+                        `, [
+                            item.quantidade,
+                            item.sabor_id,
+                            item.quantidade
+                        ]);
+
+                    if (resultado.affectedRows === 0) {
+                        throw new Error(
+                            'Estoque insuficiente para um dos sabores do pedido.'
+                        );
+                    }
                 }
             }
+        }
 
-            // Cancelamento de pedido pago:
-            // devolve estoque
-            else if (
-                status === 'cancelado' &&
-                statusAnterior === 'pago'
-            ) {
 
-                const [itens] =
-                    await connection.execute(
-                        `
-                        SELECT
-                            produto_id,
-                            quantidade
-                        FROM itens_pedido
-                        WHERE pedido_id = ?
-                        `,
-                        [id]
-                    );
+        // ======================================================
+        // CANCELAR PEDIDO PAGO
+        // ======================================================
 
-                for (let item of itens) {
+        else if (
+            status === 'cancelado' &&
+            statusAnterior === 'pago'
+        ) {
 
-                    await connection.execute(
-                        `
+            const [itens] = await connection.execute(`
+                SELECT
+                    produto_id,
+                    sabor_id,
+                    quantidade
+                FROM itens_pedido
+                WHERE pedido_id = ?
+            `, [id]);
+
+
+            for (const item of itens) {
+
+                if (item.produto_id) {
+
+                    await connection.execute(`
                         UPDATE produtos
                         SET estoque = estoque + ?
                         WHERE id = ?
-                        `,
-                        [
-                            item.quantidade,
-                            item.produto_id
-                        ]
-                    );
+                    `, [
+                        item.quantidade,
+                        item.produto_id
+                    ]);
+
+                } else if (item.sabor_id) {
+
+                    await connection.execute(`
+                        UPDATE sabores
+                        SET estoque = estoque + ?
+                        WHERE id = ?
+                    `, [
+                        item.quantidade,
+                        item.sabor_id
+                    ]);
                 }
             }
+        }
 
-            await connection.commit();
 
-            res.json({
-                sucesso: true,
-                mensagem:
-                    'Status atualizado com sucesso!'
-            });
+        await connection.execute(`
+            UPDATE pedidos
+            SET status = ?
+            WHERE id = ?
+        `, [
+            status,
+            id
+        ]);
 
-        } catch (erro) {
 
-            if (connection) {
-                try {
-                    await connection.rollback();
-                } catch {}
-            }
+        await connection.commit();
 
-            console.error(
-                'Erro ao atualizar status:',
-                erro
-            );
+        res.json({
+            sucesso: true,
+            mensagem: 'Status atualizado com sucesso!'
+        });
 
-            res.status(500).json({
-                erro:
-                    erro.message ||
-                    'Erro ao atualizar o status.'
-            });
+    } catch (erro) {
 
-        } finally {
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch {}
+        }
 
-            if (connection) {
-                await connection.end();
-            }
+        console.error(
+            'Erro ao atualizar status:',
+            erro
+        );
+
+        res.status(500).json({
+            erro:
+                erro.message ||
+                'Erro ao atualizar status.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
         }
     }
-);
+});
 
 
-// ==========================================
+// ============================================================
 // EXCLUIR PEDIDO
-// ==========================================
+// ============================================================
 
-app.delete(
-    '/pedidos/:id',
-    autenticarAdmin,
-    async (req, res) => {
+app.delete('/pedidos/:id', autenticarAdmin, async (req, res) => {
 
-        const { id } = req.params;
+    const { id } = req.params;
 
-        let connection;
+    let connection;
 
-        try {
+    try {
 
-            connection =
-                await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig);
 
-            await connection.execute(
-                'DELETE FROM pedidos WHERE id = ?',
-                [id]
-            );
+        const [resultado] = await connection.execute(
+            'DELETE FROM pedidos WHERE id = ?',
+            [id]
+        );
 
-            res.json({
-                sucesso: true,
-                mensagem:
-                    'Pedido excluído com sucesso!'
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Pedido não encontrado.'
             });
+        }
 
-        } catch (erro) {
+        res.json({
+            sucesso: true,
+            mensagem: 'Pedido excluído com sucesso!'
+        });
 
-            console.error(
-                'Erro ao excluir pedido:',
-                erro
-            );
+    } catch (erro) {
 
-            res.status(500).json({
-                erro:
-                    'Erro ao excluir pedido.'
-            });
+        console.error('Erro ao excluir pedido:', erro);
 
-        } finally {
+        res.status(500).json({
+            erro: 'Erro ao excluir pedido.'
+        });
 
-            if (connection) {
-                await connection.end();
-            }
+    } finally {
+
+        if (connection) {
+            await connection.end();
         }
     }
-);
+});
 
 
-// ==========================================
+// ============================================================
 // RELATÓRIO SEMANAL
-// ==========================================
+// ============================================================
 
-app.get(
-    '/relatorio-semanal',
-    autenticarAdmin,
-    async (req, res) => {
+app.get('/relatorio-semanal', autenticarAdmin, async (req, res) => {
 
-        let connection;
+    let connection;
 
-        try {
+    try {
 
-            connection =
-                await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig);
 
-            const query = `
-                SELECT
-                    p.id AS pedido_id,
-                    ip.quantidade,
-                    ip.preco AS preco_venda,
-                    pr.preco_custo
-                FROM pedidos p
-                JOIN itens_pedido ip
-                    ON p.id = ip.pedido_id
-                JOIN produtos pr
-                    ON ip.produto_id = pr.id
-                WHERE p.status != 'cancelado'
-                AND YEARWEEK(
-                    p.data_criacao,
-                    0
-                ) = YEARWEEK(
-                    CURDATE(),
-                    0
-                )
-            `;
+        const [rows] = await connection.execute(`
+            SELECT
+                p.id AS pedido_id,
+                ip.quantidade,
+                ip.preco AS preco_venda,
 
-            const [rows] =
-                await connection.execute(query);
+                CASE
+                    WHEN ip.produto_id IS NOT NULL
+                        THEN pr.preco_custo
+                    WHEN ip.sabor_id IS NOT NULL
+                        THEN sa.preco_custo
+                    ELSE 0
+                END AS preco_custo
 
-            let faturamentoTotal = 0;
-            let custoTotal = 0;
+            FROM pedidos p
 
-            const pedidosSemana =
-                new Set();
+            JOIN itens_pedido ip
+                ON p.id = ip.pedido_id
 
-            rows.forEach(row => {
+            LEFT JOIN produtos pr
+                ON ip.produto_id = pr.id
 
-                pedidosSemana.add(
-                    row.pedido_id
-                );
+            LEFT JOIN sabores sa
+                ON ip.sabor_id = sa.id
 
-                faturamentoTotal +=
-                    Number(row.preco_venda) *
-                    row.quantidade;
+            WHERE p.status != 'cancelado'
 
-                custoTotal +=
-                    Number(row.preco_custo || 0) *
-                    row.quantidade;
-            });
+            AND YEARWEEK(
+                p.data_criacao,
+                0
+            ) = YEARWEEK(
+                CURDATE(),
+                0
+            )
+        `);
 
-            res.json({
-                total_pedidos:
-                    pedidosSemana.size,
 
-                faturamento:
-                    faturamentoTotal,
+        let faturamentoTotal = 0;
+        let custoTotal = 0;
 
-                lucro:
-                    faturamentoTotal -
-                    custoTotal
-            });
+        const pedidosSemana =
+            new Set();
 
-        } catch (erro) {
 
-            console.error(
-                'Erro ao gerar relatório:',
-                erro
+        for (const row of rows) {
+
+            pedidosSemana.add(
+                row.pedido_id
             );
 
-            res.status(500).json({
-                erro:
-                    'Erro ao gerar relatório.'
-            });
+            faturamentoTotal +=
+                Number(row.preco_venda) *
+                Number(row.quantidade);
 
-        } finally {
+            custoTotal +=
+                Number(row.preco_custo || 0) *
+                Number(row.quantidade);
+        }
 
-            if (connection) {
-                await connection.end();
-            }
+
+        res.json({
+            total_pedidos:
+                pedidosSemana.size,
+
+            faturamento:
+                faturamentoTotal,
+
+            custo:
+                custoTotal,
+
+            lucro:
+                faturamentoTotal -
+                custoTotal
+        });
+
+    } catch (erro) {
+
+        console.error(
+            'Erro ao gerar relatório:',
+            erro
+        );
+
+        res.status(500).json({
+            erro: 'Erro ao gerar relatório.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
         }
     }
-);
+});
 
 
-// ==========================================
+// ============================================================
+// TESTE DO BANCO
+// ============================================================
+
+app.get('/status', async (req, res) => {
+
+    let connection;
+
+    try {
+
+        connection =
+            await mysql.createConnection(dbConfig);
+
+        await connection.execute(
+            'SELECT 1'
+        );
+
+        res.json({
+            online: true,
+            banco: 'adega_db',
+            mensagem: 'Servidor e banco funcionando corretamente.'
+        });
+
+    } catch (erro) {
+
+        console.error(
+            'Erro na conexão com banco:',
+            erro
+        );
+
+        res.status(500).json({
+            online: false,
+            erro: 'Não foi possível conectar ao banco.'
+        });
+
+    } finally {
+
+        if (connection) {
+            await connection.end();
+        }
+    }
+});
+
+
+// ============================================================
 // SERVIDOR
-// ==========================================
+// ============================================================
 
 const PORTA =
     Number(process.env.PORT || 3000);
