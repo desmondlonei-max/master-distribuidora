@@ -1,1152 +1,1044 @@
+require('dotenv').config();
+
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-const path = require('path');
 const crypto = require('crypto');
-require('dotenv').config();
+const path = require('path');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ============================================================
+// CONFIGURAÇÕES
+// ============================================================
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Arquivos do site
 app.use(express.static(path.join(__dirname, 'public')));
 
-
 // ============================================================
-// CONFIGURAÇÃO DO BANCO
+// BANCO DE DADOS
 // ============================================================
 
-const dbConfig = {
+const pool = mysql.createPool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'adega_db',
 
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+
     ssl: process.env.DB_SSL === 'true'
         ? { rejectUnauthorized: false }
         : undefined
-};
-
-
-// ============================================================
-// CONFIGURAÇÃO ADMIN
-// ============================================================
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
-
+});
 
 // ============================================================
-// AUTENTICAÇÃO
+// TESTE DO BANCO
 // ============================================================
 
-function criarTokenAdmin() {
+async function testarBanco() {
+    try {
+        const conexao = await pool.getConnection();
 
-    const payload = Buffer.from(
-        JSON.stringify({
-            role: 'admin',
-            exp: Date.now() + 12 * 60 * 60 * 1000
-        })
-    ).toString('base64url');
+        await conexao.query('SELECT 1');
 
-    const assinatura = crypto
-        .createHmac('sha256', ADMIN_SECRET)
-        .update(payload)
-        .digest('base64url');
+        conexao.release();
 
-    return `${payload}.${assinatura}`;
+        console.log('✅ MySQL conectado com sucesso!');
+    } catch (erro) {
+        console.error('❌ Erro ao conectar no MySQL:');
+        console.error(erro.message);
+    }
 }
 
+testarBanco();
+
+// ============================================================
+// AUTENTICAÇÃO ADMIN
+// ============================================================
+
+const ADMIN_SECRET =
+    process.env.ADMIN_SECRET ||
+    crypto.randomBytes(32).toString('hex');
+
+const ADMIN_PASSWORD =
+    process.env.ADMIN_PASSWORD || '';
+
+const tokensAdmin = new Set();
 
 function autenticarAdmin(req, res, next) {
-
     const header = req.headers.authorization || '';
 
-    const token = header.startsWith('Bearer ')
-        ? header.slice(7)
-        : '';
-
-    const partes = token.split('.');
-
-    if (
-        partes.length !== 2 ||
-        !ADMIN_SECRET
-    ) {
+    if (!header.startsWith('Bearer ')) {
         return res.status(401).json({
             erro: 'Não autorizado.'
         });
     }
 
-    const [payload, assinatura] = partes;
+    const token = header.substring(7);
 
-    const assinaturaEsperada = crypto
-        .createHmac('sha256', ADMIN_SECRET)
-        .update(payload)
-        .digest('base64url');
-
-    try {
-
-        const assinaturaBuffer =
-            Buffer.from(assinatura);
-
-        const esperadaBuffer =
-            Buffer.from(assinaturaEsperada);
-
-        if (
-            assinaturaBuffer.length !==
-            esperadaBuffer.length ||
-            !crypto.timingSafeEqual(
-                assinaturaBuffer,
-                esperadaBuffer
-            )
-        ) {
-            return res.status(401).json({
-                erro: 'Token inválido.'
-            });
-        }
-
-    } catch {
-
+    if (!tokensAdmin.has(token)) {
         return res.status(401).json({
-            erro: 'Token inválido.'
-        });
-    }
-
-
-    try {
-
-        const dados = JSON.parse(
-            Buffer.from(payload, 'base64url').toString()
-        );
-
-        if (
-            dados.role !== 'admin' ||
-            dados.exp < Date.now()
-        ) {
-            return res.status(401).json({
-                erro: 'Sessão expirada.'
-            });
-        }
-
-    } catch {
-
-        return res.status(401).json({
-            erro: 'Token inválido.'
+            erro: 'Sessão administrativa inválida ou expirada.'
         });
     }
 
     next();
 }
 
-
 // ============================================================
 // LOGIN ADMIN
 // ============================================================
 
 app.post('/admin/login', (req, res) => {
+    const { senha } = req.body;
 
-    const { senha } = req.body || {};
+    if (!ADMIN_PASSWORD) {
+        return res.status(500).json({
+            erro: 'ADMIN_PASSWORD não configurada no servidor.'
+        });
+    }
 
-    if (
-        !ADMIN_PASSWORD ||
-        senha !== ADMIN_PASSWORD
-    ) {
+    if (senha !== ADMIN_PASSWORD) {
         return res.status(401).json({
             erro: 'Senha incorreta!'
         });
     }
 
-    res.json({
-        token: criarTokenAdmin()
+    const token = crypto
+        .createHmac('sha256', ADMIN_SECRET)
+        .update(Date.now().toString() + Math.random().toString())
+        .digest('hex');
+
+    tokensAdmin.add(token);
+
+    return res.json({
+        sucesso: true,
+        token
     });
 });
-
 
 // ============================================================
 // PRODUTOS
 // ============================================================
 
-// LISTAR PRODUTOS
+// ------------------------------------------------------------
+// GET /produtos
+// ------------------------------------------------------------
+
 app.get('/produtos', async (req, res) => {
-
-    let connection;
-
     try {
+        const [produtos] = await pool.query(`
+            SELECT
+                p.id,
+                p.categoria_id,
+                p.nome,
+                p.descricao,
+                p.marca,
+                p.volume,
+                p.teor_alcoolico,
+                p.preco,
+                p.preco_promocional,
+                p.preco_custo,
+                p.preco_atacado,
+                p.estoque,
+                p.status,
+                p.imagem,
+                p.destaque,
+                p.eh_gelo_especial,
+                p.preco_especial,
+                p.criado_em
+            FROM produtos p
+            ORDER BY p.id DESC
+        `);
 
-        connection =
-            await mysql.createConnection(dbConfig);
+        // ----------------------------------------------------
+        // Novo sistema de sabores
+        //
+        // O produto pode possuir um catálogo de sabores.
+        // Como a tabela produtos não possui catalogo_id,
+        // relacionamos pelo nome do produto.
+        //
+        // Exemplo:
+        // Produto: Jack Daniel's
+        // Catálogo: Jack Daniel's
+        //
+        // Sabores:
+        // Apple
+        // Honey
+        // Fire
+        // ----------------------------------------------------
 
-        const [rows] =
-            await connection.execute(`
-                SELECT
-                    id,
-                    categoria_id,
-                    nome,
-                    descricao,
-                    marca,
-                    volume,
-                    teor_alcoolico,
-                    preco,
-                    preco_promocional,
-                    preco_custo,
-                    preco_atacado,
-                    estoque,
-                    status,
-                    imagem,
-                    destaque,
-                    eh_gelo_especial,
-                    preco_especial,
-                    criado_em
-                FROM produtos
-                ORDER BY id DESC
-            `);
+        for (const produto of produtos) {
+            const [catalogos] = await pool.query(`
+                SELECT id, nome, marca, descricao, imagem
+                FROM catalogos_sabores
+                WHERE nome = ?
+                LIMIT 1
+            `, [produto.nome]);
 
-        res.json(rows);
+            if (catalogos.length > 0) {
+                const catalogo = catalogos[0];
+
+                const [sabores] = await pool.query(`
+                    SELECT
+                        id,
+                        catalogo_id,
+                        nome,
+                        preco,
+                        preco_custo,
+                        preco_atacado,
+                        estoque,
+                        status,
+                        imagem,
+                        descricao
+                    FROM sabores
+                    WHERE catalogo_id = ?
+                    ORDER BY id ASC
+                `, [catalogo.id]);
+
+                produto.catalogo_id = catalogo.id;
+                produto.sabores = sabores;
+            } else {
+                produto.catalogo_id = null;
+                produto.sabores = [];
+            }
+        }
+
+        res.json(produtos);
 
     } catch (erro) {
-
-        console.error(
-            'Erro ao buscar produtos:',
-            erro
-        );
+        console.error('Erro ao buscar produtos:', erro);
 
         res.status(500).json({
-            erro: 'Erro interno ao buscar produtos.'
+            erro: 'Erro ao buscar produtos.'
         });
-
-    } finally {
-
-        if (connection) {
-            await connection.end();
-        }
     }
 });
 
+// ------------------------------------------------------------
+// GET /produtos/destaques
+// ------------------------------------------------------------
 
-// ============================================================
-// PRODUTOS EM DESTAQUE
-// ============================================================
-
-app.get('/produtos-destaque', async (req, res) => {
-
-    let connection;
-
+app.get('/produtos/destaques', async (req, res) => {
     try {
+        const [produtos] = await pool.query(`
+            SELECT *
+            FROM produtos
+            WHERE destaque = 1
+            ORDER BY id DESC
+        `);
 
-        connection =
-            await mysql.createConnection(dbConfig);
-
-        const [rows] =
-            await connection.execute(`
-                SELECT
-                    id,
-                    categoria_id,
-                    nome,
-                    descricao,
-                    marca,
-                    volume,
-                    teor_alcoolico,
-                    preco,
-                    preco_promocional,
-                    preco_custo,
-                    preco_atacado,
-                    estoque,
-                    status,
-                    imagem,
-                    destaque,
-                    eh_gelo_especial,
-                    preco_especial
-                FROM produtos
-                WHERE destaque = 1
-                ORDER BY id DESC
-                LIMIT 2
-            `);
-
-        res.json(rows);
+        res.json(produtos);
 
     } catch (erro) {
-
-        console.error(
-            'Erro ao buscar produtos em destaque:',
-            erro
-        );
+        console.error('Erro ao buscar destaques:', erro);
 
         res.status(500).json({
-            erro: 'Erro interno ao buscar destaques.'
+            erro: 'Erro ao buscar produtos em destaque.'
         });
-
-    } finally {
-
-        if (connection) {
-            await connection.end();
-        }
     }
 });
 
+// ------------------------------------------------------------
+// GET /produtos/:id
+// ------------------------------------------------------------
+
+app.get('/produtos/:id', async (req, res) => {
+    try {
+        const [produtos] = await pool.query(`
+            SELECT *
+            FROM produtos
+            WHERE id = ?
+            LIMIT 1
+        `, [req.params.id]);
+
+        if (produtos.length === 0) {
+            return res.status(404).json({
+                erro: 'Produto não encontrado.'
+            });
+        }
+
+        const produto = produtos[0];
+
+        const [catalogos] = await pool.query(`
+            SELECT *
+            FROM catalogos_sabores
+            WHERE nome = ?
+            LIMIT 1
+        `, [produto.nome]);
+
+        if (catalogos.length > 0) {
+            const catalogo = catalogos[0];
+
+            const [sabores] = await pool.query(`
+                SELECT *
+                FROM sabores
+                WHERE catalogo_id = ?
+                ORDER BY id ASC
+            `, [catalogo.id]);
+
+            produto.catalogo_id = catalogo.id;
+            produto.sabores = sabores;
+        } else {
+            produto.catalogo_id = null;
+            produto.sabores = [];
+        }
+
+        res.json(produto);
+
+    } catch (erro) {
+        console.error('Erro ao buscar produto:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar produto.'
+        });
+    }
+});
 
 // ============================================================
-// CADASTRAR PRODUTO
+// CRIAR PRODUTO
 // ============================================================
 
-app.post(
-    '/produtos',
-    autenticarAdmin,
-    async (req, res) => {
+app.post('/produtos', autenticarAdmin, async (req, res) => {
+    const conexao = await pool.getConnection();
+
+    try {
+        await conexao.beginTransaction();
 
         const {
             nome,
-            categoria_id,
+            descricao,
             marca,
-            preco,
-            preco_promocional,
-            preco_atacado,
-            preco_custo,
             volume,
             teor_alcoolico,
+            preco,
+            preco_promocional,
+            preco_custo,
+            preco_atacado,
             estoque,
-            imagem,
-            descricao,
             status,
+            imagem,
             destaque,
             eh_gelo_especial,
-            preco_especial
+            preco_especial,
+            categoria_id,
+            sabores
         } = req.body;
 
-
         if (!nome) {
+            await conexao.rollback();
+
             return res.status(400).json({
                 erro: 'Nome do produto é obrigatório.'
             });
         }
 
+        if (!categoria_id) {
+            await conexao.rollback();
 
-        let connection;
-
-        try {
-
-            connection =
-                await mysql.createConnection(dbConfig);
-
-            const query = `
-                INSERT INTO produtos (
-                    categoria_id,
-                    nome,
-                    descricao,
-                    marca,
-                    volume,
-                    teor_alcoolico,
-                    preco,
-                    preco_promocional,
-                    preco_custo,
-                    preco_atacado,
-                    estoque,
-                    status,
-                    imagem,
-                    destaque,
-                    eh_gelo_especial,
-                    preco_especial
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-
-            await connection.execute(
-                query,
-                [
-                    categoria_id || 1,
-                    nome,
-                    descricao || null,
-                    marca || null,
-                    volume || null,
-                    Number(teor_alcoolico) || 0,
-                    Number(preco) || 0,
-                    preco_promocional !== undefined &&
-                    preco_promocional !== null &&
-                    preco_promocional !== ''
-                        ? Number(preco_promocional)
-                        : null,
-                    Number(preco_custo) || 0,
-                    Number(preco_atacado) || 0,
-                    Number(estoque) || 0,
-                    status || 'disponivel',
-                    imagem || null,
-                    destaque ? 1 : 0,
-                    eh_gelo_especial ? 1 : 0,
-                    Number(preco_especial) || 0
-                ]
-            );
-
-
-            res.status(201).json({
-                sucesso: true,
-                mensagem:
-                    'Produto cadastrado com sucesso!'
+            return res.status(400).json({
+                erro: 'Categoria é obrigatória.'
             });
-
-        } catch (erro) {
-
-            console.error(
-                'Erro ao cadastrar produto:',
-                erro
-            );
-
-            res.status(500).json({
-                erro: 'Erro ao cadastrar produto.'
-            });
-
-        } finally {
-
-            if (connection) {
-                await connection.end();
-            }
         }
-    }
-);
 
+        // ----------------------------------------------------
+        // Produto
+        // ----------------------------------------------------
+
+        const [resultado] = await conexao.query(`
+            INSERT INTO produtos (
+                categoria_id,
+                nome,
+                descricao,
+                marca,
+                volume,
+                teor_alcoolico,
+                preco,
+                preco_promocional,
+                preco_custo,
+                preco_atacado,
+                estoque,
+                status,
+                imagem,
+                destaque,
+                eh_gelo_especial,
+                preco_especial
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            categoria_id,
+            nome,
+            descricao || null,
+            marca || null,
+            volume || null,
+            teor_alcoolico || 0,
+            preco || 0,
+            preco_promocional || null,
+            preco_custo || 0,
+            preco_atacado || 0,
+            estoque || 0,
+            status || 'disponivel',
+            imagem || null,
+            destaque ? 1 : 0,
+            eh_gelo_especial ? 1 : 0,
+            preco_especial || 0
+        ]);
+
+        // ----------------------------------------------------
+        // SABORES
+        // ----------------------------------------------------
+
+        await salvarSabores(
+            conexao,
+            nome,
+            marca,
+            sabores
+        );
+
+        await conexao.commit();
+
+        res.status(201).json({
+            sucesso: true,
+            id: resultado.insertId,
+            mensagem: 'Produto salvo com sucesso!'
+        });
+
+    } catch (erro) {
+        await conexao.rollback();
+
+        console.error('Erro ao criar produto:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao criar produto.',
+            detalhe: erro.message
+        });
+
+    } finally {
+        conexao.release();
+    }
+});
 
 // ============================================================
 // EDITAR PRODUTO
 // ============================================================
 
-app.put(
-    '/produtos/:id',
-    autenticarAdmin,
-    async (req, res) => {
+app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
+    const conexao = await pool.getConnection();
 
-        const { id } = req.params;
+    try {
+        await conexao.beginTransaction();
+
+        const id = req.params.id;
 
         const {
             nome,
-            categoria_id,
+            descricao,
             marca,
-            preco,
-            preco_promocional,
-            preco_atacado,
-            preco_custo,
             volume,
             teor_alcoolico,
+            preco,
+            preco_promocional,
+            preco_custo,
+            preco_atacado,
             estoque,
-            imagem,
-            descricao,
             status,
+            imagem,
             destaque,
             eh_gelo_especial,
-            preco_especial
+            preco_especial,
+            categoria_id,
+            sabores
         } = req.body;
 
+        if (!nome) {
+            await conexao.rollback();
 
-        let connection;
-
-        try {
-
-            connection =
-                await mysql.createConnection(dbConfig);
-
-            const query = `
-                UPDATE produtos
-                SET
-                    categoria_id = ?,
-                    nome = ?,
-                    descricao = ?,
-                    marca = ?,
-                    volume = ?,
-                    teor_alcoolico = ?,
-                    preco = ?,
-                    preco_promocional = ?,
-                    preco_custo = ?,
-                    preco_atacado = ?,
-                    estoque = ?,
-                    status = ?,
-                    imagem = ?,
-                    destaque = ?,
-                    eh_gelo_especial = ?,
-                    preco_especial = ?
-                WHERE id = ?
-            `;
-
-
-            await connection.execute(
-                query,
-                [
-                    categoria_id || 1,
-                    nome,
-                    descricao || null,
-                    marca || null,
-                    volume || null,
-                    Number(teor_alcoolico) || 0,
-                    Number(preco) || 0,
-                    preco_promocional !== undefined &&
-                    preco_promocional !== null &&
-                    preco_promocional !== ''
-                        ? Number(preco_promocional)
-                        : null,
-                    Number(preco_custo) || 0,
-                    Number(preco_atacado) || 0,
-                    Number(estoque) || 0,
-                    status || 'disponivel',
-                    imagem || null,
-                    destaque ? 1 : 0,
-                    eh_gelo_especial ? 1 : 0,
-                    Number(preco_especial) || 0,
-                    id
-                ]
-            );
-
-
-            res.json({
-                sucesso: true,
-                mensagem:
-                    'Produto atualizado com sucesso!'
+            return res.status(400).json({
+                erro: 'Nome do produto é obrigatório.'
             });
-
-        } catch (erro) {
-
-            console.error(
-                'Erro ao atualizar produto:',
-                erro
-            );
-
-            res.status(500).json({
-                erro: 'Erro ao atualizar produto.'
-            });
-
-        } finally {
-
-            if (connection) {
-                await connection.end();
-            }
         }
-    }
-);
 
+        // ----------------------------------------------------
+        // Verifica produto
+        // ----------------------------------------------------
+
+        const [produtoExistente] = await conexao.query(`
+            SELECT *
+            FROM produtos
+            WHERE id = ?
+            LIMIT 1
+        `, [id]);
+
+        if (produtoExistente.length === 0) {
+            await conexao.rollback();
+
+            return res.status(404).json({
+                erro: 'Produto não encontrado.'
+            });
+        }
+
+        const nomeAntigo = produtoExistente[0].nome;
+
+        // ----------------------------------------------------
+        // Atualiza produto
+        // ----------------------------------------------------
+
+        await conexao.query(`
+            UPDATE produtos
+            SET
+                categoria_id = ?,
+                nome = ?,
+                descricao = ?,
+                marca = ?,
+                volume = ?,
+                teor_alcoolico = ?,
+                preco = ?,
+                preco_promocional = ?,
+                preco_custo = ?,
+                preco_atacado = ?,
+                estoque = ?,
+                status = ?,
+                imagem = ?,
+                destaque = ?,
+                eh_gelo_especial = ?,
+                preco_especial = ?
+            WHERE id = ?
+        `, [
+            categoria_id || produtoExistente[0].categoria_id,
+            nome,
+            descricao || null,
+            marca || null,
+            volume || null,
+            teor_alcoolico || 0,
+            preco || 0,
+            preco_promocional || null,
+            preco_custo || 0,
+            preco_atacado || 0,
+            estoque || 0,
+            status || 'disponivel',
+            imagem || null,
+            destaque ? 1 : 0,
+            eh_gelo_especial ? 1 : 0,
+            preco_especial || 0,
+            id
+        ]);
+
+        // ----------------------------------------------------
+        // Se o nome mudou, renomeia o catálogo correspondente
+        // ----------------------------------------------------
+
+        if (nomeAntigo !== nome) {
+            await conexao.query(`
+                UPDATE catalogos_sabores
+                SET nome = ?
+                WHERE nome = ?
+            `, [nome, nomeAntigo]);
+        }
+
+        // ----------------------------------------------------
+        // Atualiza sabores
+        // ----------------------------------------------------
+
+        await salvarSabores(
+            conexao,
+            nome,
+            marca,
+            sabores
+        );
+
+        await conexao.commit();
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Produto atualizado com sucesso!'
+        });
+
+    } catch (erro) {
+        await conexao.rollback();
+
+        console.error('Erro ao atualizar produto:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar produto.',
+            detalhe: erro.message
+        });
+
+    } finally {
+        conexao.release();
+    }
+});
 
 // ============================================================
 // EXCLUIR PRODUTO
 // ============================================================
 
-app.delete(
-    '/produtos/:id',
-    autenticarAdmin,
-    async (req, res) => {
+app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
+    const conexao = await pool.getConnection();
 
-        const { id } = req.params;
+    try {
+        await conexao.beginTransaction();
 
-        let connection;
+        const id = req.params.id;
 
-        try {
+        const [produtos] = await conexao.query(`
+            SELECT nome
+            FROM produtos
+            WHERE id = ?
+            LIMIT 1
+        `, [id]);
 
-            connection =
-                await mysql.createConnection(dbConfig);
+        if (produtos.length === 0) {
+            await conexao.rollback();
 
-            await connection.execute(
-                'DELETE FROM produtos WHERE id = ?',
-                [id]
-            );
-
-            res.json({
-                sucesso: true,
-                mensagem:
-                    'Produto excluído com sucesso!'
+            return res.status(404).json({
+                erro: 'Produto não encontrado.'
             });
-
-        } catch (erro) {
-
-            console.error(
-                'Erro ao excluir produto:',
-                erro
-            );
-
-            res.status(500).json({
-                erro:
-                    'Erro ao excluir produto.'
-            });
-
-        } finally {
-
-            if (connection) {
-                await connection.end();
-            }
         }
-    }
-);
 
+        const nomeProduto = produtos[0].nome;
+
+        // ----------------------------------------------------
+        // Primeiro remove catálogo/sabores
+        // ----------------------------------------------------
+
+        const [catalogos] = await conexao.query(`
+            SELECT id
+            FROM catalogos_sabores
+            WHERE nome = ?
+        `, [nomeProduto]);
+
+        for (const catalogo of catalogos) {
+            await conexao.query(`
+                DELETE FROM sabores
+                WHERE catalogo_id = ?
+            `, [catalogo.id]);
+
+            await conexao.query(`
+                DELETE FROM catalogos_sabores
+                WHERE id = ?
+            `, [catalogo.id]);
+        }
+
+        // ----------------------------------------------------
+        // Depois remove produto
+        // ----------------------------------------------------
+
+        await conexao.query(`
+            DELETE FROM produtos
+            WHERE id = ?
+        `, [id]);
+
+        await conexao.commit();
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Produto excluído com sucesso!'
+        });
+
+    } catch (erro) {
+        await conexao.rollback();
+
+        console.error('Erro ao excluir produto:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir produto.',
+            detalhe: erro.message
+        });
+
+    } finally {
+        conexao.release();
+    }
+});
+
+// ============================================================
+// FUNÇÃO DO NOVO SISTEMA DE SABORES
+// ============================================================
+
+async function salvarSabores(
+    conexao,
+    nomeProduto,
+    marca,
+    saboresRecebidos
+) {
+    // --------------------------------------------------------
+    // Se não existem sabores:
+    // remove catálogo existente e encerra.
+    // --------------------------------------------------------
+
+    if (
+        !saboresRecebidos ||
+        (
+            typeof saboresRecebidos === 'string' &&
+            saboresRecebidos.trim() === ''
+        )
+    ) {
+        const [catalogos] = await conexao.query(`
+            SELECT id
+            FROM catalogos_sabores
+            WHERE nome = ?
+        `, [nomeProduto]);
+
+        for (const catalogo of catalogos) {
+            await conexao.query(`
+                DELETE FROM sabores
+                WHERE catalogo_id = ?
+            `, [catalogo.id]);
+
+            await conexao.query(`
+                DELETE FROM catalogos_sabores
+                WHERE id = ?
+            `, [catalogo.id]);
+        }
+
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Aceita:
+    //
+    // "Melancia, Maçã Verde, Uva"
+    //
+    // ou:
+    //
+    // ["Melancia", "Maçã Verde", "Uva"]
+    // --------------------------------------------------------
+
+    let listaSabores = [];
+
+    if (Array.isArray(saboresRecebidos)) {
+        listaSabores = saboresRecebidos;
+    } else if (typeof saboresRecebidos === 'string') {
+        listaSabores = saboresRecebidos
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+    }
+
+    // Remove duplicados
+    listaSabores = [...new Set(listaSabores)];
+
+    // --------------------------------------------------------
+    // Procura catálogo
+    // --------------------------------------------------------
+
+    const [catalogos] = await conexao.query(`
+        SELECT id
+        FROM catalogos_sabores
+        WHERE nome = ?
+        LIMIT 1
+    `, [nomeProduto]);
+
+    let catalogoId;
+
+    if (catalogos.length > 0) {
+        catalogoId = catalogos[0].id;
+
+        await conexao.query(`
+            UPDATE catalogos_sabores
+            SET marca = ?
+            WHERE id = ?
+        `, [
+            marca || null,
+            catalogoId
+        ]);
+
+        // Limpa sabores antigos
+        await conexao.query(`
+            DELETE FROM sabores
+            WHERE catalogo_id = ?
+        `, [catalogoId]);
+
+    } else {
+        const [resultado] = await conexao.query(`
+            INSERT INTO catalogos_sabores (
+                nome,
+                marca
+            )
+            VALUES (?, ?)
+        `, [
+            nomeProduto,
+            marca || null
+        ]);
+
+        catalogoId = resultado.insertId;
+    }
+
+    // --------------------------------------------------------
+    // Cria os novos sabores
+    // --------------------------------------------------------
+
+    for (const nomeSabor of listaSabores) {
+        await conexao.query(`
+            INSERT INTO sabores (
+                catalogo_id,
+                nome,
+                preco,
+                preco_custo,
+                preco_atacado,
+                estoque,
+                status,
+                imagem,
+                descricao
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            catalogoId,
+            nomeSabor,
+            0,
+            0,
+            0,
+            0,
+            'disponivel',
+            null,
+            null
+        ]);
+    }
+}
 
 // ============================================================
 // CATÁLOGOS DE SABORES
 // ============================================================
 
-// LISTAR CATÁLOGOS
+// ------------------------------------------------------------
+// GET /catalogos-sabores
+// ------------------------------------------------------------
+
 app.get('/catalogos-sabores', async (req, res) => {
-
-    let connection;
-
     try {
+        const [catalogos] = await pool.query(`
+            SELECT *
+            FROM catalogos_sabores
+            ORDER BY nome ASC
+        `);
 
-        connection =
-            await mysql.createConnection(dbConfig);
+        for (const catalogo of catalogos) {
+            const [sabores] = await pool.query(`
+                SELECT *
+                FROM sabores
+                WHERE catalogo_id = ?
+                ORDER BY nome ASC
+            `, [catalogo.id]);
 
-        const [catalogos] =
-            await connection.execute(`
-                SELECT
-                    id,
-                    nome,
-                    marca,
-                    descricao,
-                    imagem,
-                    criado_em
-                FROM catalogos_sabores
-                ORDER BY id DESC
-            `);
+            catalogo.sabores = sabores;
+        }
 
         res.json(catalogos);
 
     } catch (erro) {
-
-        console.error(
-            'Erro ao buscar catálogos:',
-            erro
-        );
+        console.error('Erro ao buscar catálogos:', erro);
 
         res.status(500).json({
-            erro: 'Erro ao buscar catálogos.'
+            erro: 'Erro ao buscar catálogos de sabores.'
         });
-
-    } finally {
-
-        if (connection) {
-            await connection.end();
-        }
     }
 });
 
+// ------------------------------------------------------------
+// GET /catalogos-sabores/:id
+// ------------------------------------------------------------
 
-// ============================================================
-// SABORES
-// ============================================================
-
-// LISTAR SABORES
-app.get('/sabores', async (req, res) => {
-
-    let connection;
-
+app.get('/catalogos-sabores/:id', async (req, res) => {
     try {
+        const [catalogos] = await pool.query(`
+            SELECT *
+            FROM catalogos_sabores
+            WHERE id = ?
+            LIMIT 1
+        `, [req.params.id]);
 
-        connection =
-            await mysql.createConnection(dbConfig);
+        if (catalogos.length === 0) {
+            return res.status(404).json({
+                erro: 'Catálogo não encontrado.'
+            });
+        }
 
-        const [sabores] =
-            await connection.execute(`
-                SELECT
-                    s.id,
-                    s.catalogo_id,
-                    c.nome AS catalogo_nome,
-                    c.marca AS catalogo_marca,
-                    s.nome,
-                    s.preco,
-                    s.preco_custo,
-                    s.preco_atacado,
-                    s.estoque,
-                    s.status,
-                    s.imagem,
-                    s.descricao,
-                    s.criado_em
-                FROM sabores s
-                INNER JOIN catalogos_sabores c
-                    ON s.catalogo_id = c.id
-                ORDER BY s.id DESC
-            `);
+        const catalogo = catalogos[0];
 
-        res.json(sabores);
+        const [sabores] = await pool.query(`
+            SELECT *
+            FROM sabores
+            WHERE catalogo_id = ?
+            ORDER BY nome ASC
+        `, [catalogo.id]);
+
+        catalogo.sabores = sabores;
+
+        res.json(catalogo);
 
     } catch (erro) {
-
-        console.error(
-            'Erro ao buscar sabores:',
-            erro
-        );
+        console.error('Erro ao buscar catálogo:', erro);
 
         res.status(500).json({
-            erro: 'Erro ao buscar sabores.'
+            erro: 'Erro ao buscar catálogo.'
         });
-
-    } finally {
-
-        if (connection) {
-            await connection.end();
-        }
     }
 });
-
 
 // ============================================================
 // PEDIDOS
 // ============================================================
 
-app.get(
-    '/pedidos',
-    autenticarAdmin,
-    async (req, res) => {
-
-        let connection;
-
-        try {
-
-            connection =
-                await mysql.createConnection(dbConfig);
-
-            const [pedidos] =
-                await connection.execute(`
-                    SELECT
-                        id,
-                        nome_cliente,
-                        telefone,
-                        endereco,
-                        valor_total,
-                        status,
-                        data_criacao
-                    FROM pedidos
-                    ORDER BY id DESC
-                `);
-
-
-            const pedidosComItens = [];
-
-
-            for (const pedido of pedidos) {
-
-                const [itens] =
-                    await connection.execute(`
-                        SELECT
-                            ip.id,
-                            ip.quantidade,
-                            ip.preco,
-
-                            ip.produto_id,
-                            ip.sabor_id,
-
-                            p.nome AS produto_nome,
-
-                            s.nome AS sabor_nome,
-
-                            c.nome AS catalogo_nome
-
-                        FROM itens_pedido ip
-
-                        LEFT JOIN produtos p
-                            ON ip.produto_id = p.id
-
-                        LEFT JOIN sabores s
-                            ON ip.sabor_id = s.id
-
-                        LEFT JOIN catalogos_sabores c
-                            ON s.catalogo_id = c.id
-
-                        WHERE ip.pedido_id = ?
-
-                        ORDER BY ip.id ASC
-                    `, [pedido.id]);
-
-
-                const itensFormatados =
-                    itens.map(item => {
-
-                        let nome = item.produto_nome;
-
-                        if (item.sabor_nome) {
-
-                            if (item.catalogo_nome) {
-                                nome =
-                                    `${item.catalogo_nome} - ${item.sabor_nome}`;
-                            } else {
-                                nome =
-                                    item.sabor_nome;
-                            }
-                        }
-
-                        return {
-                            ...item,
-                            nome
-                        };
-                    });
-
-
-                pedidosComItens.push({
-                    ...pedido,
-                    itens: itensFormatados
-                });
-            }
-
-
-            res.json(pedidosComItens);
-
-        } catch (erro) {
-
-            console.error(
-                'Erro ao buscar pedidos:',
-                erro
-            );
-
-            res.status(500).json({
-                erro:
-                    'Erro interno ao buscar pedidos.'
-            });
-
-        } finally {
-
-            if (connection) {
-                await connection.end();
-            }
-        }
-    }
-);
-
-
-// ============================================================
+// ------------------------------------------------------------
 // CRIAR PEDIDO
-// ============================================================
+// ------------------------------------------------------------
 
 app.post('/pedidos', async (req, res) => {
-
-    const {
-        nome_cliente,
-        telefone,
-        endereco,
-        itens
-    } = req.body;
-
-
-    if (
-        !nome_cliente ||
-        !telefone ||
-        !endereco
-    ) {
-        return res.status(400).json({
-            erro:
-                'Nome, telefone e endereço são obrigatórios.'
-        });
-    }
-
-
-    if (
-        !Array.isArray(itens) ||
-        itens.length === 0
-    ) {
-        return res.status(400).json({
-            erro: 'O carrinho está vazio.'
-        });
-    }
-
-
-    let connection;
-
+    const conexao = await pool.getConnection();
 
     try {
+        await conexao.beginTransaction();
 
-        connection =
-            await mysql.createConnection(dbConfig);
+        const {
+            nome_cliente,
+            telefone,
+            endereco,
+            itens
+        } = req.body;
 
-        await connection.beginTransaction();
+        if (
+            !nome_cliente ||
+            !telefone ||
+            !endereco ||
+            !Array.isArray(itens) ||
+            itens.length === 0
+        ) {
+            await conexao.rollback();
 
+            return res.status(400).json({
+                erro: 'Dados do pedido incompletos.'
+            });
+        }
 
-        let subtotalVarejo = 0;
+        let valorTotal = 0;
 
-        const itensValidados = [];
+        const itensProcessados = [];
 
-
-        // ====================================================
-        // VALIDAR TODOS OS ITENS
-        // ====================================================
+        // ----------------------------------------------------
+        // Processa produtos e sabores
+        // ----------------------------------------------------
 
         for (const item of itens) {
+            const quantidade = Number(item.quantidade);
 
-            const quantidade =
-                Number(item.quantidade);
-
-            if (
-                !quantidade ||
-                quantidade <= 0
-            ) {
-                throw new Error(
-                    'Quantidade de produto inválida.'
-                );
+            if (!quantidade || quantidade <= 0) {
+                throw new Error('Quantidade inválida.');
             }
 
-
-            // -----------------------------------------------
-            // PRODUTO NORMAL
-            // -----------------------------------------------
-
+            // Produto normal
             if (item.produto_id) {
+                const [produtos] = await conexao.query(`
+                    SELECT *
+                    FROM produtos
+                    WHERE id = ?
+                    LIMIT 1
+                `, [item.produto_id]);
 
-                const [rows] =
-                    await connection.execute(`
-                        SELECT
-                            id,
-                            nome,
-                            preco,
-                            preco_atacado,
-                            estoque,
-                            eh_gelo_especial,
-                            preco_especial
-                        FROM produtos
-                        WHERE id = ?
-                        FOR UPDATE
-                    `, [item.produto_id]);
+                if (produtos.length === 0) {
+                    throw new Error('Produto não encontrado.');
+                }
 
+                const produto = produtos[0];
 
-                if (rows.length === 0) {
+                if (produto.estoque < quantidade) {
                     throw new Error(
-                        `Produto ID ${item.produto_id} não encontrado.`
+                        `Estoque insuficiente para ${produto.nome}.`
                     );
                 }
 
+                const preco = Number(
+                    produto.preco_promocional ||
+                    produto.preco
+                );
 
-                const produto =
-                    rows[0];
+                valorTotal += preco * quantidade;
 
-
-                if (
-                    produto.estoque <
-                    quantidade
-                ) {
-                    throw new Error(
-                        `Estoque insuficiente para "${produto.nome}". Disponível: ${produto.estoque}`
-                    );
-                }
-
-
-                let preco =
-                    Number(produto.preco);
-
-
-                // -------------------------------------------
-                // GELO ESPECIAL
-                // -------------------------------------------
-
-                if (
-                    Number(produto.eh_gelo_especial) === 1
-                ) {
-
-                    if (
-                        produto.preco_especial &&
-                        Number(produto.preco_especial) > 0
-                    ) {
-
-                        preco =
-                            Number(
-                                produto.preco_especial
-                            );
-
-                    } else {
-
-                        const pacotesDeSeis =
-                            Math.floor(
-                                quantidade / 6
-                            );
-
-                        const resto =
-                            quantidade % 6;
-
-
-                        const valorTotal =
-                            (pacotesDeSeis * 20) +
-                            (resto * 4);
-
-
-                        preco =
-                            valorTotal /
-                            quantidade;
-                    }
-                }
-
-
-                subtotalVarejo +=
-                    preco * quantidade;
-
-
-                itensValidados.push({
-
-                    produto_id:
-                        produto.id,
-
-                    sabor_id:
-                        null,
-
+                itensProcessados.push({
+                    produto_id: produto.id,
+                    sabor_id: null,
                     quantidade,
-
-                    preco,
-
-                    preco_atacado:
-                        Number(
-                            produto.preco_atacado || 0
-                        ),
-
-                    eh_gelo:
-                        Number(
-                            produto.eh_gelo_especial
-                        ) === 1
+                    preco
                 });
-
             }
 
-
-            // -----------------------------------------------
-            // SABOR
-            // -----------------------------------------------
-
+            // Sabor
             else if (item.sabor_id) {
+                const [sabores] = await conexao.query(`
+                    SELECT *
+                    FROM sabores
+                    WHERE id = ?
+                    LIMIT 1
+                `, [item.sabor_id]);
 
-                const [rows] =
-                    await connection.execute(`
-                        SELECT
-                            s.id,
-                            s.nome,
-                            s.preco,
-                            s.preco_atacado,
-                            s.estoque,
-                            c.nome AS catalogo_nome
-                        FROM sabores s
-                        INNER JOIN catalogos_sabores c
-                            ON s.catalogo_id = c.id
-                        WHERE s.id = ?
-                        FOR UPDATE
-                    `, [item.sabor_id]);
+                if (sabores.length === 0) {
+                    throw new Error('Sabor não encontrado.');
+                }
 
+                const sabor = sabores[0];
 
-                if (rows.length === 0) {
+                if (sabor.estoque < quantidade) {
                     throw new Error(
-                        `Sabor ID ${item.sabor_id} não encontrado.`
+                        `Estoque insuficiente para ${sabor.nome}.`
                     );
                 }
 
+                const preco = Number(sabor.preco);
 
-                const sabor =
-                    rows[0];
+                valorTotal += preco * quantidade;
 
-
-                if (
-                    sabor.estoque <
-                    quantidade
-                ) {
-                    throw new Error(
-                        `Estoque insuficiente para "${sabor.catalogo_nome} - ${sabor.nome}". Disponível: ${sabor.estoque}`
-                    );
-                }
-
-
-                const preco =
-                    Number(sabor.preco);
-
-
-                subtotalVarejo +=
-                    preco * quantidade;
-
-
-                itensValidados.push({
-
-                    produto_id:
-                        null,
-
-                    sabor_id:
-                        sabor.id,
-
+                itensProcessados.push({
+                    produto_id: null,
+                    sabor_id: sabor.id,
                     quantidade,
-
-                    preco,
-
-                    preco_atacado:
-                        Number(
-                            sabor.preco_atacado || 0
-                        ),
-
-                    eh_gelo:
-                        false
+                    preco
                 });
-
             }
 
             else {
-
                 throw new Error(
                     'Item do pedido não possui produto_id nem sabor_id.'
                 );
             }
         }
 
+        // ----------------------------------------------------
+        // Pedido
+        // ----------------------------------------------------
 
-        // ====================================================
-        // REGRA DE ATACADO
-        // ====================================================
-
-        const atingiuAtacado =
-            subtotalVarejo > 250;
-
-
-        let valorTotal =
-            0;
-
-
-        for (const item of itensValidados) {
-
-            let precoFinal =
-                item.preco;
-
-
-            if (
-                atingiuAtacado &&
-                item.preco_atacado > 0 &&
-                !item.eh_gelo
-            ) {
-
-                precoFinal =
-                    item.preco_atacado;
-            }
-
-
-            item.precoFinal =
-                precoFinal;
-
-
-            valorTotal +=
-                precoFinal *
-                item.quantidade;
-        }
-
-
-        // ====================================================
-        // CRIAR PEDIDO
-        // ====================================================
-
-        const [resultadoPedido] =
-            await connection.execute(`
-                INSERT INTO pedidos (
-                    nome_cliente,
-                    telefone,
-                    endereco,
-                    valor_total,
-                    status
-                )
-                VALUES (?, ?, ?, ?, ?)
-            `, [
+        const [pedido] = await conexao.query(`
+            INSERT INTO pedidos (
                 nome_cliente,
                 telefone,
                 endereco,
-                valorTotal,
-                'pendente'
-            ]);
+                valor_total,
+                status
+            )
+            VALUES (?, ?, ?, ?, ?)
+        `, [
+            nome_cliente,
+            telefone,
+            endereco,
+            valorTotal,
+            'pendente'
+        ]);
 
+        const pedidoId = pedido.insertId;
 
-        const pedidoId =
-            resultadoPedido.insertId;
+        // ----------------------------------------------------
+        // Itens
+        // ----------------------------------------------------
 
+        for (const item of itensProcessados) {
 
-        // ====================================================
-        // INSERIR ITENS
-        // ====================================================
-
-        for (const item of itensValidados) {
-
-            await connection.execute(`
+            await conexao.query(`
                 INSERT INTO itens_pedido (
                     pedido_id,
                     produto_id,
@@ -1156,88 +1048,139 @@ app.post('/pedidos', async (req, res) => {
                 )
                 VALUES (?, ?, ?, ?, ?)
             `, [
-
                 pedidoId,
-
                 item.produto_id,
-
                 item.sabor_id,
-
                 item.quantidade,
-
-                item.precoFinal
+                item.preco
             ]);
+
+            // Atualiza estoque
+            if (item.produto_id) {
+                await conexao.query(`
+                    UPDATE produtos
+                    SET estoque = estoque - ?
+                    WHERE id = ?
+                `, [
+                    item.quantidade,
+                    item.produto_id
+                ]);
+            }
+
+            if (item.sabor_id) {
+                await conexao.query(`
+                    UPDATE sabores
+                    SET estoque = estoque - ?
+                    WHERE id = ?
+                `, [
+                    item.quantidade,
+                    item.sabor_id
+                ]);
+            }
         }
 
-
-        await connection.commit();
-
+        await conexao.commit();
 
         res.status(201).json({
-
             sucesso: true,
-
-            mensagem:
-                'Pedido realizado com sucesso!',
-
-            pedido_id:
-                pedidoId,
-
-            valor_total:
-                valorTotal,
-
-            chave_pix:
-                'masterdistribuidoracm@gmail.com'
+            pedido_id: pedidoId,
+            valor_total: valorTotal,
+            mensagem: 'Pedido realizado com sucesso!'
         });
-
 
     } catch (erro) {
+        await conexao.rollback();
 
-        if (connection) {
-
-            try {
-                await connection.rollback();
-            } catch {}
-        }
-
-
-        console.error(
-            'Erro ao processar pedido:',
-            erro
-        );
-
+        console.error('Erro ao criar pedido:', erro);
 
         res.status(400).json({
-
-            erro:
-                erro.message ||
-                'Erro ao processar o pedido.'
+            erro: erro.message
         });
 
-
     } finally {
-
-        if (connection) {
-            await connection.end();
-        }
+        conexao.release();
     }
 });
 
+// ============================================================
+// LISTAR PEDIDOS - ADMIN
+// ============================================================
+
+app.get('/pedidos', autenticarAdmin, async (req, res) => {
+    try {
+        const [pedidos] = await pool.query(`
+            SELECT *
+            FROM pedidos
+            ORDER BY data_criacao DESC
+        `);
+
+        for (const pedido of pedidos) {
+
+            const [itens] = await pool.query(`
+                SELECT
+                    ip.id,
+                    ip.quantidade,
+                    ip.preco,
+
+                    p.nome AS produto_nome,
+
+                    s.nome AS sabor_nome,
+
+                    cs.nome AS catalogo_nome
+
+                FROM itens_pedido ip
+
+                LEFT JOIN produtos p
+                    ON ip.produto_id = p.id
+
+                LEFT JOIN sabores s
+                    ON ip.sabor_id = s.id
+
+                LEFT JOIN catalogos_sabores cs
+                    ON s.catalogo_id = cs.id
+
+                WHERE ip.pedido_id = ?
+
+                ORDER BY ip.id ASC
+            `, [pedido.id]);
+
+            pedido.itens = itens.map(item => {
+
+                let nome = item.produto_nome;
+
+                if (item.sabor_nome) {
+                    nome = `${item.catalogo_nome} - ${item.sabor_nome}`;
+                }
+
+                return {
+                    id: item.id,
+                    nome,
+                    quantidade: item.quantidade,
+                    preco: item.preco
+                };
+            });
+        }
+
+        res.json(pedidos);
+
+    } catch (erro) {
+        console.error('Erro ao buscar pedidos:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar pedidos.'
+        });
+    }
+});
 
 // ============================================================
 // ALTERAR STATUS DO PEDIDO
 // ============================================================
 
-app.put(
-    '/pedidos/:id/status',
-    autenticarAdmin,
-    async (req, res) => {
-
-        const { id } = req.params;
+app.put('/pedidos/:id/status', autenticarAdmin, async (req, res) => {
+    try {
         const { status } = req.body;
 
-
-        const statusPermitidos = [
+        const statusValidos = [
             'pendente',
             'pago',
             'enviado',
@@ -1245,504 +1188,244 @@ app.put(
             'cancelado'
         ];
 
-
-        if (
-            !statusPermitidos.includes(status)
-        ) {
+        if (!statusValidos.includes(status)) {
             return res.status(400).json({
-                erro:
-                    'Status inválido.'
+                erro: 'Status inválido.'
             });
         }
 
+        const [resultado] = await pool.query(`
+            UPDATE pedidos
+            SET status = ?
+            WHERE id = ?
+        `, [
+            status,
+            req.params.id
+        ]);
 
-        let connection;
-
-
-        try {
-
-            connection =
-                await mysql.createConnection(dbConfig);
-
-            await connection.beginTransaction();
-
-
-            const [pedidoRows] =
-                await connection.execute(
-                    `
-                    SELECT status
-                    FROM pedidos
-                    WHERE id = ?
-                    FOR UPDATE
-                    `,
-                    [id]
-                );
-
-
-            if (pedidoRows.length === 0) {
-
-                throw new Error(
-                    'Pedido não encontrado.'
-                );
-            }
-
-
-            const statusAnterior =
-                pedidoRows[0].status;
-
-
-            // =================================================
-            // PAGAMENTO
-            // =================================================
-
-            if (
-                status === 'pago' &&
-                statusAnterior !== 'pago'
-            ) {
-
-                const [itens] =
-                    await connection.execute(`
-                        SELECT
-                            produto_id,
-                            sabor_id,
-                            quantidade
-                        FROM itens_pedido
-                        WHERE pedido_id = ?
-                    `, [id]);
-
-
-                for (const item of itens) {
-
-                    // PRODUTO
-                    if (item.produto_id) {
-
-                        const [resultado] =
-                            await connection.execute(`
-                                UPDATE produtos
-                                SET estoque =
-                                    estoque - ?
-                                WHERE id = ?
-                                AND estoque >= ?
-                            `, [
-                                item.quantidade,
-                                item.produto_id,
-                                item.quantidade
-                            ]);
-
-
-                        if (
-                            resultado.affectedRows === 0
-                        ) {
-                            throw new Error(
-                                'Estoque insuficiente para um dos produtos do pedido.'
-                            );
-                        }
-
-                    }
-
-
-                    // SABOR
-                    else if (item.sabor_id) {
-
-                        const [resultado] =
-                            await connection.execute(`
-                                UPDATE sabores
-                                SET estoque =
-                                    estoque - ?
-                                WHERE id = ?
-                                AND estoque >= ?
-                            `, [
-                                item.quantidade,
-                                item.sabor_id,
-                                item.quantidade
-                            ]);
-
-
-                        if (
-                            resultado.affectedRows === 0
-                        ) {
-                            throw new Error(
-                                'Estoque insuficiente para um dos sabores do pedido.'
-                            );
-                        }
-                    }
-                }
-            }
-
-
-            // =================================================
-            // CANCELAMENTO DE PEDIDO PAGO
-            // DEVOLVE ESTOQUE
-            // =================================================
-
-            else if (
-                status === 'cancelado' &&
-                statusAnterior === 'pago'
-            ) {
-
-                const [itens] =
-                    await connection.execute(`
-                        SELECT
-                            produto_id,
-                            sabor_id,
-                            quantidade
-                        FROM itens_pedido
-                        WHERE pedido_id = ?
-                    `, [id]);
-
-
-                for (const item of itens) {
-
-                    if (item.produto_id) {
-
-                        await connection.execute(`
-                            UPDATE produtos
-                            SET estoque =
-                                estoque + ?
-                            WHERE id = ?
-                        `, [
-                            item.quantidade,
-                            item.produto_id
-                        ]);
-
-                    }
-
-
-                    else if (item.sabor_id) {
-
-                        await connection.execute(`
-                            UPDATE sabores
-                            SET estoque =
-                                estoque + ?
-                            WHERE id = ?
-                        `, [
-                            item.quantidade,
-                            item.sabor_id
-                        ]);
-                    }
-                }
-            }
-
-
-            // =================================================
-            // ATUALIZAR STATUS
-            // =================================================
-
-            await connection.execute(
-                `
-                UPDATE pedidos
-                SET status = ?
-                WHERE id = ?
-                `,
-                [
-                    status,
-                    id
-                ]
-            );
-
-
-            await connection.commit();
-
-
-            res.json({
-                sucesso: true,
-                mensagem:
-                    'Status atualizado com sucesso!'
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Pedido não encontrado.'
             });
-
-
-        } catch (erro) {
-
-            if (connection) {
-
-                try {
-                    await connection.rollback();
-                } catch {}
-            }
-
-
-            console.error(
-                'Erro ao atualizar status:',
-                erro
-            );
-
-
-            res.status(500).json({
-                erro:
-                    erro.message ||
-                    'Erro ao atualizar o status.'
-            });
-
-
-        } finally {
-
-            if (connection) {
-                await connection.end();
-            }
         }
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Status atualizado.'
+        });
+
+    } catch (erro) {
+        console.error('Erro ao atualizar status:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar status.'
+        });
     }
-);
-
+});
 
 // ============================================================
 // EXCLUIR PEDIDO
 // ============================================================
 
-app.delete(
-    '/pedidos/:id',
-    autenticarAdmin,
-    async (req, res) => {
+app.delete('/pedidos/:id', autenticarAdmin, async (req, res) => {
+    const conexao = await pool.getConnection();
 
-        const { id } = req.params;
+    try {
+        await conexao.beginTransaction();
 
-        let connection;
+        const pedidoId = req.params.id;
 
+        const [itens] = await conexao.query(`
+            SELECT
+                produto_id,
+                sabor_id,
+                quantidade
+            FROM itens_pedido
+            WHERE pedido_id = ?
+        `, [pedidoId]);
 
-        try {
+        // ----------------------------------------------------
+        // Devolve estoque antes de excluir
+        // ----------------------------------------------------
 
-            connection =
-                await mysql.createConnection(dbConfig);
+        for (const item of itens) {
 
+            if (item.produto_id) {
+                await conexao.query(`
+                    UPDATE produtos
+                    SET estoque = estoque + ?
+                    WHERE id = ?
+                `, [
+                    item.quantidade,
+                    item.produto_id
+                ]);
+            }
 
-            await connection.execute(
-                'DELETE FROM pedidos WHERE id = ?',
-                [id]
-            );
-
-
-            res.json({
-                sucesso: true,
-                mensagem:
-                    'Pedido excluído com sucesso!'
-            });
-
-
-        } catch (erro) {
-
-            console.error(
-                'Erro ao excluir pedido:',
-                erro
-            );
-
-
-            res.status(500).json({
-                erro:
-                    'Erro ao excluir pedido.'
-            });
-
-
-        } finally {
-
-            if (connection) {
-                await connection.end();
+            if (item.sabor_id) {
+                await conexao.query(`
+                    UPDATE sabores
+                    SET estoque = estoque + ?
+                    WHERE id = ?
+                `, [
+                    item.quantidade,
+                    item.sabor_id
+                ]);
             }
         }
-    }
-);
 
+        await conexao.query(`
+            DELETE FROM itens_pedido
+            WHERE pedido_id = ?
+        `, [pedidoId]);
+
+        const [resultado] = await conexao.query(`
+            DELETE FROM pedidos
+            WHERE id = ?
+        `, [pedidoId]);
+
+        if (resultado.affectedRows === 0) {
+            await conexao.rollback();
+
+            return res.status(404).json({
+                erro: 'Pedido não encontrado.'
+            });
+        }
+
+        await conexao.commit();
+
+        res.json({
+            sucesso: true,
+            mensagem: 'Pedido excluído com sucesso.'
+        });
+
+    } catch (erro) {
+        await conexao.rollback();
+
+        console.error('Erro ao excluir pedido:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir pedido.'
+        });
+
+    } finally {
+        conexao.release();
+    }
+});
 
 // ============================================================
 // RELATÓRIO SEMANAL
 // ============================================================
 
-app.get(
-    '/relatorio-semanal',
-    autenticarAdmin,
-    async (req, res) => {
-
-        let connection;
-
-
-        try {
-
-            connection =
-                await mysql.createConnection(dbConfig);
-
-
-            const [rows] =
-                await connection.execute(`
-                    SELECT
-                        p.id AS pedido_id,
-                        ip.quantidade,
-                        ip.preco AS preco_venda,
-
-                        CASE
-
-                            WHEN ip.produto_id IS NOT NULL
-                                THEN COALESCE(
-                                    pr.preco_custo,
-                                    0
-                                )
-
-                            WHEN ip.sabor_id IS NOT NULL
-                                THEN COALESCE(
-                                    s.preco_custo,
-                                    0
-                                )
-
-                            ELSE 0
-
-                        END AS preco_custo
-
-                    FROM pedidos p
-
-                    INNER JOIN itens_pedido ip
-                        ON p.id = ip.pedido_id
-
-                    LEFT JOIN produtos pr
-                        ON ip.produto_id = pr.id
-
-                    LEFT JOIN sabores s
-                        ON ip.sabor_id = s.id
-
-                    WHERE p.status != 'cancelado'
-
-                    AND YEARWEEK(
-                        p.data_criacao,
-                        0
-                    ) = YEARWEEK(
-                        CURDATE(),
-                        0
-                    )
-                `);
-
-
-            let faturamentoTotal =
-                0;
-
-            let custoTotal =
-                0;
-
-
-            const pedidosSemana =
-                new Set();
-
-
-            rows.forEach(row => {
-
-                pedidosSemana.add(
-                    row.pedido_id
-                );
-
-
-                faturamentoTotal +=
-                    Number(row.preco_venda) *
-                    Number(row.quantidade);
-
-
-                custoTotal +=
-                    Number(row.preco_custo || 0) *
-                    Number(row.quantidade);
-            });
-
-
-            res.json({
-
-                total_pedidos:
-                    pedidosSemana.size,
-
-                faturamento:
-                    faturamentoTotal,
-
-                lucro:
-                    faturamentoTotal -
-                    custoTotal
-            });
-
-
-        } catch (erro) {
-
-            console.error(
-                'Erro ao gerar relatório:',
-                erro
-            );
-
-
-            res.status(500).json({
-                erro:
-                    'Erro ao gerar relatório.'
-            });
-
-
-        } finally {
-
-            if (connection) {
-                await connection.end();
-            }
-        }
-    }
-);
-
-
-// ============================================================
-// TESTE DO BANCO
-// ============================================================
-
-app.get('/teste-banco', async (req, res) => {
-
-    let connection;
-
+app.get('/relatorio-semanal', autenticarAdmin, async (req, res) => {
     try {
 
-        connection =
-            await mysql.createConnection(dbConfig);
+        const [resultado] = await pool.query(`
+            SELECT
+                COUNT(*) AS total_pedidos,
+                COALESCE(SUM(valor_total), 0) AS faturamento
+            FROM pedidos
+            WHERE
+                data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                AND status <> 'cancelado'
+        `);
 
+        const totalPedidos =
+            Number(resultado[0].total_pedidos) || 0;
 
-        const [rows] =
-            await connection.execute(
-                'SELECT 1 AS conectado'
-            );
+        const faturamento =
+            Number(resultado[0].faturamento) || 0;
 
+        // ----------------------------------------------------
+        // Calcula custo dos produtos vendidos
+        // ----------------------------------------------------
+
+        const [custos] = await pool.query(`
+            SELECT
+                COALESCE(
+                    SUM(
+                        ip.quantidade *
+                        COALESCE(
+                            p.preco_custo,
+                            s.preco_custo,
+                            0
+                        )
+                    ),
+                    0
+                ) AS custo
+            FROM itens_pedido ip
+
+            INNER JOIN pedidos pe
+                ON ip.pedido_id = pe.id
+
+            LEFT JOIN produtos p
+                ON ip.produto_id = p.id
+
+            LEFT JOIN sabores s
+                ON ip.sabor_id = s.id
+
+            WHERE
+                pe.data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                AND pe.status <> 'cancelado'
+        `);
+
+        const custo =
+            Number(custos[0].custo) || 0;
+
+        const lucro = faturamento - custo;
 
         res.json({
-            sucesso: true,
-            mensagem:
-                'Conexão com MySQL funcionando!',
-            resultado:
-                rows
+            total_pedidos: totalPedidos,
+            faturamento,
+            lucro
         });
-
 
     } catch (erro) {
-
-        console.error(
-            'Erro de conexão:',
-            erro
-        );
-
+        console.error('Erro no relatório:', erro);
 
         res.status(500).json({
-            sucesso: false,
-            erro:
-                'Não foi possível conectar ao MySQL.'
+            erro: 'Erro ao gerar relatório semanal.'
         });
-
-
-    } finally {
-
-        if (connection) {
-            await connection.end();
-        }
     }
 });
 
+// ============================================================
+// ROTA PRINCIPAL
+// ============================================================
+
+app.get('/', (req, res) => {
+    res.sendFile(
+        path.join(__dirname, 'public', 'index.html')
+    );
+});
 
 // ============================================================
-// SERVIDOR
+// 404
 // ============================================================
 
-const PORTA =
-    Number(process.env.PORT || 3000);
+app.use((req, res) => {
+    res.status(404).json({
+        erro: 'Rota não encontrada.'
+    });
+});
 
+// ============================================================
+// ERRO GLOBAL
+// ============================================================
 
-app.listen(
-    PORTA,
-    '0.0.0.0',
-    () => {
+app.use((erro, req, res, next) => {
+    console.error('Erro global:', erro);
 
-        console.log(
-            `Servidor rodando na porta ${PORTA}`
-        );
+    res.status(500).json({
+        erro: 'Erro interno do servidor.'
+    });
+});
 
-    }
-);
+// ============================================================
+// INICIAR SERVIDOR
+// ============================================================
+
+app.listen(PORT, () => {
+    console.log('======================================');
+    console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    console.log('======================================');
+});
