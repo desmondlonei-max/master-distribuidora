@@ -328,7 +328,7 @@
                     </div>
 
                     <h3 class="text-2xl sm:text-3xl font-black text-slate-900">
-                        Ofertas Especiais
+                        Ofertas especiais
                     </h3>
 
                     <p class="text-sm text-slate-500 mt-1">
@@ -388,7 +388,7 @@
                 </div>
 
                 <h3 class="text-2xl sm:text-3xl font-black text-slate-900">
-                    Produtos
+                    Nossos produtos
                 </h3>
 
                 <p class="text-sm text-slate-500 mt-1">
@@ -1237,7 +1237,6 @@
                     preco_atacado: Number(variacao.preco_atacado || 0),
                     estoque: estoqueDisponivel,
                     imagem: variacao.imagem || produto.imagem,
-                    eh_gelo_especial: false,
                     quantidade: 1
                 });
             }
@@ -1463,8 +1462,7 @@
                         ...produto,
                         preco: Number(variacao.preco),
                         preco_atacado: Number(variacao.preco_atacado || 0),
-                        estoque: Number(variacao.estoque) || 0,
-                        eh_gelo_especial: false
+                        estoque: Number(variacao.estoque) || 0
                     }
                 };
             }
@@ -1602,6 +1600,9 @@
         }
 
 
+        // Quando o produto é "gelo especial" e tem variações (sabores), a faixa de
+        // preço (1un / 6un / >10un) considera a soma de TODAS as quantidades desse
+        // mesmo produto no carrinho, somando os sabores — não cada sabor isolado.
         function calcularPrecoEfetivoItem(
             item,
             subtotalVarejoGeral
@@ -1615,6 +1616,10 @@
                 item.eh_gelo_especial == 1 ||
                 item.eh_gelo_especial === true
             ) {
+
+                qtd = carrinho
+                    .filter(i => i.id === item.id && (i.eh_gelo_especial == 1 || i.eh_gelo_especial === true))
+                    .reduce((soma, i) => soma + (parseInt(i.quantidade) || 0), 0);
 
                 if (qtd > 10) {
 
