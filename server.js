@@ -670,7 +670,9 @@ app.post('/pedidos', async (req, res) => {
 
         let subtotalVarejo = 0;
         const produtosDoPedido = [];
+        const itensComDados = [];
 
+        // 1ª passada: busca os dados de cada item (produto ou variação) e valida estoque.
         for (let item of itens) {
             // Se o item veio com variacao_id, os dados de estoque/preço vêm da variação (sabor),
             // não do produto base — cada sabor tem seu próprio estoque e preço.
@@ -713,11 +715,29 @@ app.post('/pedidos', async (req, res) => {
                 );
             }
 
+            itensComDados.push({ item, produtoDb, variacaoId });
+        }
+
+        // Soma as quantidades de gelo especial por PRODUTO BASE (não por sabor), já que
+        // a faixa de preço (1un / 6un / >10un) considera o total comprado do produto,
+        // somando todos os sabores dele.
+        const qtdGeloPorProduto = {};
+
+        for (const { item, produtoDb } of itensComDados) {
+            if (produtoDb.eh_gelo_especial) {
+                qtdGeloPorProduto[produtoDb.id] =
+                    (qtdGeloPorProduto[produtoDb.id] || 0) + Number(item.quantidade);
+            }
+        }
+
+        // 2ª passada: calcula o preço de cada item já considerando a quantidade agregada do gelo.
+        for (const { item, produtoDb, variacaoId } of itensComDados) {
+
             let precoBaseItem = Number(produtoDb.preco);
 
             // Regra do gelo especial
             if (produtoDb.eh_gelo_especial) {
-                const qtd = Number(item.quantidade);
+                const qtd = qtdGeloPorProduto[produtoDb.id];
 
                 if (qtd > 10) {
                     precoBaseItem = 2.50;
