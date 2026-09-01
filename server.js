@@ -612,7 +612,7 @@ app.get('/pedidos', autenticarAdmin, async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
 
         const [pedidos] = await connection.execute(
-            'SELECT id, nome_cliente, telefone, endereco, valor_total, status FROM pedidos ORDER BY id DESC'
+            'SELECT id, nome_cliente, telefone, endereco, valor_total, taxa_entrega, status FROM pedidos ORDER BY id DESC'
         );
 
         const pedidosComItens = [];
@@ -653,6 +653,7 @@ app.post('/pedidos', async (req, res) => {
         nome_cliente,
         telefone,
         endereco,
+        entrega,
         itens
     } = req.body;
 
@@ -661,6 +662,10 @@ app.post('/pedidos', async (req, res) => {
             erro: 'O carrinho está vazio.'
         });
     }
+
+    // Taxa fixa de entrega: soma R$5,00 ao total quando o cliente marca a opção.
+    // Calculada aqui (servidor), nunca confiando no valor que o front-end mandar.
+    const taxaEntrega = entrega ? 5.00 : 0.00;
 
     let connection;
 
@@ -792,13 +797,16 @@ app.post('/pedidos', async (req, res) => {
                 precoFinalItem * prod.quantidade;
         }
 
+        novoValorTotalCalculado += taxaEntrega;
+
         const [resultadoPedido] = await connection.execute(
-            'INSERT INTO pedidos (nome_cliente, telefone, endereco, valor_total, status) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO pedidos (nome_cliente, telefone, endereco, valor_total, taxa_entrega, status) VALUES (?, ?, ?, ?, ?, ?)',
             [
                 nome_cliente,
                 telefone,
                 endereco,
                 novoValorTotalCalculado,
+                taxaEntrega,
                 'pendente'
             ]
         );
