@@ -474,6 +474,11 @@
             <!-- RODAPÉ -->
             <div class="border-t border-slate-200 p-5 sm:p-6 bg-slate-50">
 
+                <div id="linha-taxa-entrega" class="hidden flex justify-between items-center mb-1.5 text-xs">
+                    <span class="text-slate-500 font-semibold">Taxa de entrega</span>
+                    <span class="text-slate-700 font-bold">+ R$ 5,00</span>
+                </div>
+
                 <div class="flex justify-between items-center mb-4">
 
                     <span class="text-sm font-semibold text-slate-500">
@@ -515,6 +520,15 @@
                               rows="3"
                               placeholder="Endereço completo (Rua, Número, Bairro, Cidade)"
                               class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+
+                    <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                        <input type="checkbox"
+                               id="entrega"
+                               onchange="atualizarCarrinhoUI()"
+                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="flex-1">Entrega</span>
+                        <span class="text-blue-600 font-bold text-xs">+ R$ 5,00</span>
+                    </label>
 
                     <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
 
@@ -1752,10 +1766,25 @@
             });
 
 
+            // Taxa de entrega: soma R$5,00 quando o cliente marca a opção no checkout.
+            const checkboxEntrega =
+                document.getElementById('entrega');
+
+            const entregaSelecionada =
+                checkboxEntrega ? checkboxEntrega.checked : false;
+
+            const taxaEntrega =
+                entregaSelecionada ? 5.00 : 0.00;
+
+            valorTotalReal += taxaEntrega;
+
+
             return {
                 valorTotal: valorTotalReal,
                 passouDe250,
-                subtotalParcial
+                subtotalParcial,
+                entregaSelecionada,
+                taxaEntrega
             };
 
         }
@@ -1843,8 +1872,17 @@
             const {
                 valorTotal,
                 passouDe250,
-                subtotalParcial
+                subtotalParcial,
+                entregaSelecionada
             } = calcularTotalCarrinho();
+
+
+            const linhaTaxaEntrega =
+                document.getElementById('linha-taxa-entrega');
+
+            if (linhaTaxaEntrega) {
+                linhaTaxaEntrega.classList.toggle('hidden', !entregaSelecionada);
+            }
 
 
             itensContainer.innerHTML = '';
@@ -2155,7 +2193,8 @@
 
                     const {
                         valorTotal,
-                        subtotalParcial
+                        subtotalParcial,
+                        entregaSelecionada
                     } =
                         calcularTotalCarrinho();
 
@@ -2167,6 +2206,9 @@
                         telefone,
 
                         endereco,
+
+                        entrega:
+                            entregaSelecionada,
 
                         valor_total:
                             valorTotal,
@@ -2336,3 +2378,4 @@
 
 </body>
 </html>
+
