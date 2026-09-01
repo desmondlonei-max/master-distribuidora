@@ -796,7 +796,10 @@
                             <td class="p-3 font-semibold text-gray-900">${ped.nome_cliente}</td>
                             <td class="p-3 text-xs text-gray-600">${ped.telefone}<br>${ped.endereco}</td>
                             <td class="p-3 text-xs">${itensTexto}</td>
-                            <td class="p-3 font-semibold">R$ ${Number(ped.valor_total || 0).toFixed(2).replace('.', ',')}</td>
+                            <td class="p-3 font-semibold">
+                                R$ ${Number(ped.valor_total || 0).toFixed(2).replace('.', ',')}
+                                ${Number(ped.taxa_entrega || 0) > 0 ? `<span class="block text-[10px] font-normal text-blue-600">+ R$ ${Number(ped.taxa_entrega).toFixed(2).replace('.', ',')} entrega</span>` : ''}
+                            </td>
                             <td class="p-3">
                                 <select onchange="atualizarStatus(${ped.id}, this.value)" class="border rounded-lg p-1.5 text-xs font-semibold cursor-pointer transition-colors duration-200 ${corStatus}">
                                     <option value="pendente" ${ped.status === 'pendente' ? 'selected' : ''} class="bg-white text-gray-800">Pendente</option>
