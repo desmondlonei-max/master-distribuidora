@@ -498,7 +498,7 @@
                     <div class="border-t border-slate-200 pt-4">
 
                         <p class="text-xs uppercase tracking-wider text-blue-600 font-black mb-3">
-                            Dados de entrega
+                            Dados do pedido
                         </p>
 
                     </div>
@@ -515,22 +515,90 @@
                            placeholder="Telefone / WhatsApp"
                            class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
 
-                    <textarea id="endereco"
-                              required
-                              rows="3"
-                              placeholder="Endereço completo (Rua, Número, Bairro, Cidade)"
-                              class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+                    <!-- COMO DESEJA RECEBER -->
+                    <div class="space-y-2">
 
-                    <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
-                        <input type="checkbox"
-                               id="entrega"
-                               onchange="atualizarCarrinhoUI()"
-                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                        <span class="flex-1">Entrega</span>
-                        <span class="text-blue-600 font-bold text-xs">+ R$ 5,00</span>
-                    </label>
+                        <p class="text-xs font-bold text-slate-600">
+                            Como deseja receber?
+                        </p>
 
-                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
+                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                            <input type="radio"
+                                   name="tipo_entrega"
+                                   id="tipo-entrega-entrega"
+                                   value="entrega"
+                                   checked
+                                   onchange="alternarTipoEntrega()"
+                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                            <span class="flex-1">Receber em casa (entrega)</span>
+                            <span class="text-blue-600 font-bold text-xs">+ R$ 5,00</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                            <input type="radio"
+                                   name="tipo_entrega"
+                                   id="tipo-entrega-retirada"
+                                   value="retirada"
+                                   onchange="alternarTipoEntrega()"
+                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                            <span class="flex-1">Retirar na loja</span>
+                            <span class="text-slate-400 font-bold text-xs">Grátis</span>
+                        </label>
+
+                    </div>
+
+                    <div id="bloco-endereco">
+
+                        <textarea id="endereco"
+                                  required
+                                  rows="3"
+                                  placeholder="Endereço completo (Rua, Número, Bairro, Cidade)"
+                                  class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+
+                    </div>
+
+                    <!-- FORMA DE PAGAMENTO -->
+                    <div class="space-y-2">
+
+                        <p class="text-xs font-bold text-slate-600">
+                            Forma de pagamento
+                        </p>
+
+                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                            <input type="radio"
+                                   name="forma_pagamento"
+                                   id="pagamento-pix"
+                                   value="pix"
+                                   checked
+                                   onchange="alternarFormaPagamento()"
+                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                            <span class="flex-1">PIX</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                            <input type="radio"
+                                   name="forma_pagamento"
+                                   id="pagamento-dinheiro"
+                                   value="dinheiro"
+                                   onchange="alternarFormaPagamento()"
+                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                            <span class="flex-1">Dinheiro (espécie)</span>
+                        </label>
+
+                    </div>
+
+                    <div id="bloco-troco" class="hidden">
+
+                        <input type="number"
+                               step="0.01"
+                               min="0"
+                               id="troco-para"
+                               placeholder="Precisa de troco? Para quanto? (opcional)"
+                               class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+
+                    </div>
+
+                    <div id="bloco-info-pagamento" class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
 
                         <span class="font-black">
                             Pagamento:
@@ -541,6 +609,7 @@
                     </div>
 
                     <button type="submit"
+                            id="btn-finalizar-pedido"
                             class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition shadow-lg shadow-blue-600/20">
                         Finalizar pedido via PIX
                     </button>
@@ -577,12 +646,12 @@
                 Pedido realizado!
             </h3>
 
-            <p class="text-slate-500 text-sm mt-2 leading-relaxed">
+            <p id="modal-subtitulo" class="text-slate-500 text-sm mt-2 leading-relaxed">
                 Agora faça o pagamento via PIX utilizando a chave abaixo.
             </p>
 
 
-            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-6 text-left">
+            <div id="bloco-chave-pix" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-6 text-left">
 
                 <span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold block mb-1">
                     Chave PIX
@@ -596,13 +665,26 @@
             </div>
 
 
-            <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 mt-4 text-left">
+            <div id="bloco-troco-confirmacao" class="hidden bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-4 text-left">
+
+                <span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold block mb-1">
+                    Troco para
+                </span>
+
+                <span id="troco-confirmacao-texto"
+                      class="text-blue-600 font-mono font-black text-sm">
+                </span>
+
+            </div>
+
+
+            <div id="bloco-importante" class="bg-blue-50 border border-blue-100 rounded-2xl p-4 mt-4 text-left">
 
                 <p class="text-xs font-black text-blue-800 mb-2">
                     IMPORTANTE
                 </p>
 
-                <p class="text-xs text-blue-700 leading-relaxed">
+                <p id="texto-importante" class="text-xs text-blue-700 leading-relaxed">
                     Para confirmar e liberar seu pedido, envie o comprovante do PIX pelo nosso WhatsApp:
                 </p>
 
@@ -629,7 +711,9 @@
                         <path d="M20.52 3.48A11.85 11.85 0 0012.08 0C5.53 0 .2 5.33.2 11.88c0 2.09.55 4.13 1.59 5.93L.1 24l6.33-1.66a11.87 11.87 0 005.65 1.43h.01c6.55 0 11.88-5.33 11.88-11.88 0-3.17-1.23-6.15-3.45-8.41zM12.09 21.73h-.01a9.85 9.85 0 01-5.02-1.37l-.36-.21-3.76.99 1-3.66-.23-.38a9.84 9.84 0 01-1.51-5.22C2.2 6.44 6.63 2 12.08 2a9.82 9.82 0 016.98 2.89 9.82 9.82 0 012.89 6.99c0 5.45-4.43 9.85-9.86 9.85zm5.4-7.38c-.3-.15-1.78-.88-2.05-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.96 1.18-.18.2-.35.23-.65.08-.3-.15-1.26-.46-2.4-1.47-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.03-.53-.08-.15-.68-1.63-.93-2.23-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.53.08-.8.38-.28.3-1.05 1.03-1.05 2.5s1.08 2.9 1.23 3.1c.15.2 2.12 3.24 5.14 4.54.72.31 1.28.49 1.72.63.72.23 1.38.2 1.9.12.58-.09 1.78-.73 2.03-1.43.25-.7.25-1.3.18-1.43-.08-.13-.28-.2-.58-.35z"/>
                     </svg>
 
-                    Enviar comprovante no WhatsApp
+                    <span id="btn-whatsapp-texto">
+                        Enviar comprovante no WhatsApp
+                    </span>
 
                 </a>
 
@@ -1766,12 +1850,12 @@
             });
 
 
-            // Taxa de entrega: soma R$5,00 quando o cliente marca a opção no checkout.
-            const checkboxEntrega =
-                document.getElementById('entrega');
+            // Taxa de entrega: soma R$5,00 quando o cliente escolhe "Receber em casa".
+            const radioEntrega =
+                document.getElementById('tipo-entrega-entrega');
 
             const entregaSelecionada =
-                checkboxEntrega ? checkboxEntrega.checked : false;
+                radioEntrega ? radioEntrega.checked : true;
 
             const taxaEntrega =
                 entregaSelecionada ? 5.00 : 0.00;
@@ -2134,6 +2218,77 @@
         }
 
 
+        // Alterna entre "Receber em casa" (exige endereço, soma taxa) e "Retirar na
+        // loja" (sem endereço, sem taxa de entrega).
+        function alternarTipoEntrega() {
+
+            const entregaSelecionada =
+                document.getElementById('tipo-entrega-entrega').checked;
+
+            const blocoEndereco =
+                document.getElementById('bloco-endereco');
+
+            const enderecoInput =
+                document.getElementById('endereco');
+
+            if (entregaSelecionada) {
+                blocoEndereco.classList.remove('hidden');
+                enderecoInput.setAttribute('required', 'required');
+            } else {
+                blocoEndereco.classList.add('hidden');
+                enderecoInput.removeAttribute('required');
+                enderecoInput.value = '';
+            }
+
+            atualizarCarrinhoUI();
+            alternarFormaPagamento();
+        }
+
+        // Alterna as instruções de pagamento (PIX x Dinheiro) e mostra o campo de
+        // troco só quando faz sentido (pagamento em dinheiro + entrega em casa).
+        function alternarFormaPagamento() {
+
+            const dinheiroSelecionado =
+                document.getElementById('pagamento-dinheiro').checked;
+
+            const entregaSelecionada =
+                document.getElementById('tipo-entrega-entrega').checked;
+
+            const blocoTroco =
+                document.getElementById('bloco-troco');
+
+            const blocoInfo =
+                document.getElementById('bloco-info-pagamento');
+
+            const btnFinalizar =
+                document.getElementById('btn-finalizar-pedido');
+
+            if (dinheiroSelecionado) {
+
+                blocoTroco.classList.toggle('hidden', !entregaSelecionada);
+
+                blocoInfo.innerHTML = `
+                    <span class="font-black">Pagamento:</span>
+                    Em espécie (dinheiro), na ${entregaSelecionada ? 'entrega' : 'retirada na loja'}.
+                `;
+
+                btnFinalizar.textContent = 'Finalizar pedido';
+
+            } else {
+
+                blocoTroco.classList.add('hidden');
+
+                blocoInfo.innerHTML = `
+                    <span class="font-black">Pagamento:</span>
+                    PIX — a chave será exibida após finalizar.
+                `;
+
+                btnFinalizar.textContent = 'Finalizar pedido via PIX';
+
+            }
+        }
+
+
         function mostrarFormularioCheckout() {
 
             if (carrinho.length === 0) {
@@ -2154,6 +2309,96 @@
             document
                 .getElementById('btn-ir-checkout')
                 .classList.add('hidden');
+
+        }
+
+
+        // Monta o modal de confirmação pós-pedido de acordo com a forma de pagamento
+        // (PIX x Dinheiro) e o tipo de recebimento (entrega x retirada na loja).
+        function abrirModalConfirmacao(formaPagamento, entregaSelecionada, trocoPara) {
+
+            const subtitulo =
+                document.getElementById('modal-subtitulo');
+
+            const blocoChavePix =
+                document.getElementById('bloco-chave-pix');
+
+            const blocoTrocoConfirmacao =
+                document.getElementById('bloco-troco-confirmacao');
+
+            const textoImportante =
+                document.getElementById('texto-importante');
+
+            const btnWhatsapp =
+                document.getElementById('btn-whatsapp');
+
+            const btnWhatsappTexto =
+                document.getElementById('btn-whatsapp-texto');
+
+            const localRecebimento =
+                entregaSelecionada ? 'na entrega' : 'na retirada na loja';
+
+            if (formaPagamento === 'pix') {
+
+                subtitulo.textContent =
+                    'Agora faça o pagamento via PIX utilizando a chave abaixo.';
+
+                blocoChavePix.classList.remove('hidden');
+
+                blocoTrocoConfirmacao.classList.add('hidden');
+
+                textoImportante.textContent =
+                    'Para confirmar e liberar seu pedido, envie o comprovante do PIX pelo nosso WhatsApp:';
+
+                btnWhatsappTexto.textContent =
+                    'Enviar comprovante no WhatsApp';
+
+                btnWhatsapp.href =
+                    'https://wa.me/558699878778?text=' +
+                    encodeURIComponent(
+                        'Olá! Acabei de fazer um pedido na Master Distribuidora. Segue o comprovante do PIX:'
+                    );
+
+            } else {
+
+                subtitulo.textContent =
+                    `Pedido registrado! O pagamento será em dinheiro ${localRecebimento}.`;
+
+                blocoChavePix.classList.add('hidden');
+
+                if (trocoPara) {
+
+                    document.getElementById('troco-confirmacao-texto').textContent =
+                        `R$ ${Number(trocoPara).toFixed(2)}`;
+
+                    blocoTrocoConfirmacao.classList.remove('hidden');
+
+                } else {
+
+                    blocoTrocoConfirmacao.classList.add('hidden');
+
+                }
+
+                textoImportante.textContent =
+                    `Tenha o valor combinado em mãos ${localRecebimento}. Qualquer dúvida, fale com a gente pelo WhatsApp:`;
+
+                btnWhatsappTexto.textContent =
+                    'Confirmar pedido no WhatsApp';
+
+                btnWhatsapp.href =
+                    'https://wa.me/558699878778?text=' +
+                    encodeURIComponent(
+                        'Olá! Acabei de fazer um pedido na Master Distribuidora. Pagamento em dinheiro ' +
+                        localRecebimento + '.'
+                    );
+
+            }
+
+            document
+                .getElementById('modal-pix')
+                .classList.remove('hidden');
+
+            document.body.classList.add('overflow-hidden');
 
         }
 
@@ -2183,7 +2428,7 @@
                             .value;
 
 
-                    const endereco =
+                    const enderecoDigitado =
                         document
                             .getElementById(
                                 'endereco'
@@ -2199,6 +2444,27 @@
                         calcularTotalCarrinho();
 
 
+                    const tipoEntrega =
+                        entregaSelecionada ? 'entrega' : 'retirada';
+
+                    // Se for retirada na loja, não há endereço de entrega — grava um texto fixo.
+                    const endereco =
+                        entregaSelecionada ? enderecoDigitado : 'Retirada na loja';
+
+                    const formaPagamento =
+                        document.getElementById('pagamento-dinheiro').checked
+                            ? 'dinheiro'
+                            : 'pix';
+
+                    const trocoInput =
+                        document.getElementById('troco-para');
+
+                    const trocoPara =
+                        (formaPagamento === 'dinheiro' && entregaSelecionada && trocoInput && trocoInput.value)
+                            ? parseFloat(trocoInput.value)
+                            : null;
+
+
                     const dadosPedido = {
 
                         nome_cliente,
@@ -2207,8 +2473,14 @@
 
                         endereco,
 
-                        entrega:
-                            entregaSelecionada,
+                        tipo_entrega:
+                            tipoEntrega,
+
+                        forma_pagamento:
+                            formaPagamento,
+
+                        troco_para:
+                            trocoPara,
 
                         valor_total:
                             valorTotal,
@@ -2276,28 +2548,7 @@
 
                             fecharCarrinho();
 
-
-                            document
-                                .getElementById(
-                                    'chave-pix-texto'
-                                )
-                                .textContent =
-                                'masterdistribuidoracm@gmail.com';
-
-
-                            document
-                                .getElementById(
-                                    'modal-pix'
-                                )
-                                .classList.remove(
-                                    'hidden'
-                                );
-
-
-                            document.body.classList.add(
-                                'overflow-hidden'
-                            );
-
+                            abrirModalConfirmacao(formaPagamento, entregaSelecionada, trocoPara);
 
                         } else {
 
@@ -2339,6 +2590,8 @@
 
             formCheckout.reset();
 
+            alternarTipoEntrega();
+
             formCheckout.classList.add(
                 'hidden'
             );
@@ -2378,4 +2631,3 @@
 
 </body>
 </html>
-
