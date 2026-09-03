@@ -791,9 +791,22 @@
                     if (ped.status === 'entregue') corStatus = 'bg-green-100 text-green-800 border-green-300';
                     if (ped.status === 'cancelado') corStatus = 'bg-red-100 text-red-800 border-red-300';
 
+                    const badgeTipoEntrega =
+                        ped.tipo_entrega === 'retirada'
+                            ? '<span class="inline-block bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full">🏬 Retirada na loja</span>'
+                            : '<span class="inline-block bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">🛵 Entrega</span>';
+
+                    const badgePagamento =
+                        ped.forma_pagamento === 'dinheiro'
+                            ? `<span class="inline-block bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">💵 Dinheiro${Number(ped.troco_para || 0) > 0 ? ` (troco p/ R$ ${Number(ped.troco_para).toFixed(2).replace('.', ',')})` : ''}</span>`
+                            : '<span class="inline-block bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">💳 PIX</span>';
+
                     tbody.innerHTML += `
                         <tr class="border-b hover:bg-gray-50/50">
-                            <td class="p-3 font-semibold text-gray-900">${ped.nome_cliente}</td>
+                            <td class="p-3 font-semibold text-gray-900">
+                                ${ped.nome_cliente}
+                                <div class="flex flex-wrap gap-1 mt-1">${badgeTipoEntrega}${badgePagamento}</div>
+                            </td>
                             <td class="p-3 text-xs text-gray-600">${ped.telefone}<br>${ped.endereco}</td>
                             <td class="p-3 text-xs">${itensTexto}</td>
                             <td class="p-3 font-semibold">
@@ -843,4 +856,3 @@
     </script>
 </body>
 </html>
-
