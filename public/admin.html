@@ -172,8 +172,26 @@
         </main>
     </div>
 
+    <!-- MODAL DE NOTA DO PEDIDO -->
+    <div id="modal-nota" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-gray-100 overflow-hidden">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-gray-800">Nota do Pedido</h3>
+                <button onclick="fecharNota()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+            <div class="p-4 max-h-[70vh] overflow-y-auto flex justify-center bg-gray-50">
+                <img id="nota-preview" class="w-full rounded-lg shadow border border-gray-200" alt="Nota do pedido">
+            </div>
+            <div class="p-4 border-t grid grid-cols-2 gap-3">
+                <button onclick="baixarNota()" class="bg-gray-800 text-white font-semibold py-2.5 rounded-xl hover:bg-gray-900 transition text-sm">Baixar</button>
+                <button onclick="compartilharNota()" class="bg-blue-600 text-white font-semibold py-2.5 rounded-xl hover:bg-blue-700 transition text-sm">Compartilhar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = '';
+        let pedidosCache = [];
         let adminToken = sessionStorage.getItem('admin_token') || '';
 
         async function apiFetch(url, options = {}) {
@@ -779,6 +797,7 @@
             try {
                 const res = await apiFetch(`${API_URL}/pedidos`);
                 const pedidos = await res.json();
+                pedidosCache = pedidos;
                 const tbody = document.getElementById('tabela-pedidos');
                 tbody.innerHTML = '';
 
@@ -822,7 +841,8 @@
                                     <option value="cancelado" ${ped.status === 'cancelado' ? 'selected' : ''} class="bg-white text-gray-800">Cancelado</option>
                                 </select>
                             </td>
-                            <td class="p-3 text-right whitespace-nowrap">
+                            <td class="p-3 text-right whitespace-nowrap space-x-2">
+                                <button onclick="abrirNota(${ped.id})" class="text-blue-600 hover:underline font-semibold">Gerar Nota</button>
                                 <button onclick="excluirPedido(${ped.id})" class="text-red-600 hover:uideline font-semibold">Excluir</button>
                             </td>
                         </tr>
@@ -851,6 +871,278 @@
             if (res.ok) {
                 carregarPedidos();
                 carregarRelatorioSemanal();
+            }
+        }
+
+        // ==========================================
+        // GERAÇÃO DA NOTA DO PEDIDO (IMAGEM)
+        // ==========================================
+        let notaBlobAtual = null;
+
+        function carregarImagem(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        function quebrarTexto(ctx, texto, maxLargura) {
+            const palavras = String(texto).split(' ');
+            const linhas = [];
+            let linhaAtual = '';
+            palavras.forEach(palavra => {
+                const teste = linhaAtual ? `${linhaAtual} ${palavra}` : palavra;
+                if (ctx.measureText(teste).width > maxLargura && linhaAtual) {
+                    linhas.push(linhaAtual);
+                    linhaAtual = palavra;
+                } else {
+                    linhaAtual = teste;
+                }
+            });
+            if (linhaAtual) linhas.push(linhaAtual);
+            return linhas;
+        }
+
+        function formatarMoeda(valor) {
+            return `R$ ${Number(valor || 0).toFixed(2).replace('.', ',')}`;
+        }
+
+        async function desenharNota(pedido) {
+            const largura = 600;
+            const margem = 32;
+            const larguraUtil = largura - margem * 2;
+
+            // Canvas temporário só para medir a altura necessária antes de desenhar de verdade
+            const canvasMedida = document.createElement('canvas');
+            const ctxMedida = canvasMedida.getContext('2d');
+
+            let alturaEstimativa = 260; // cabeçalho + dados do cliente
+            ctxMedida.font = '14px Arial';
+            pedido.itens.forEach(item => {
+                const nomeItem = item.sabor_variacao ? `${item.nome} - ${item.sabor_variacao}` : item.nome;
+                const linhas = quebrarTexto(ctxMedida, nomeItem, larguraUtil - 140);
+                alturaEstimativa += Math.max(linhas.length, 1) * 20 + 10;
+            });
+            alturaEstimativa += 170; // totais + rodapé
+
+            const canvas = document.createElement('canvas');
+            canvas.width = largura;
+            canvas.height = alturaEstimativa;
+            const ctx = canvas.getContext('2d');
+
+            // Fundo
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let y = 34;
+
+            // Logo
+            try {
+                const logo = await carregarImagem('/logo.png');
+                const tamanhoLogo = 56;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(margem + tamanhoLogo / 2, y + tamanhoLogo / 2, tamanhoLogo / 2, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(logo, margem, y, tamanhoLogo, tamanhoLogo);
+                ctx.restore();
+            } catch (e) {
+                console.warn('Não foi possível carregar a logo:', e);
+            }
+
+            ctx.fillStyle = '#111827';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('Master Distribuidora', margem + 68, y + 24);
+            ctx.font = '13px Arial';
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('Nota de Pedido', margem + 68, y + 44);
+
+            y += 76;
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 26;
+
+            // Dados do pedido
+            ctx.fillStyle = '#111827';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`Pedido #${pedido.id}`, margem, y);
+
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#6b7280';
+            const dataPedido = pedido.data_criacao ? new Date(pedido.data_criacao) : new Date();
+            const dataTexto = dataPedido.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+            ctx.textAlign = 'right';
+            ctx.fillText(dataTexto, largura - margem, y);
+            ctx.textAlign = 'left';
+
+            y += 22;
+            ctx.font = '13px Arial';
+            ctx.fillStyle = '#374151';
+            ctx.fillText(`Cliente: ${pedido.nome_cliente}`, margem, y);
+            y += 18;
+            ctx.fillText(`Telefone: ${pedido.telefone}`, margem, y);
+            y += 18;
+            const linhasEndereco = quebrarTexto(ctx, `Endereço: ${pedido.endereco}`, larguraUtil);
+            linhasEndereco.forEach(linha => {
+                ctx.fillText(linha, margem, y);
+                y += 18;
+            });
+
+            y += 10;
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 24;
+
+            // Cabeçalho da tabela de itens
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('QTD', margem, y);
+            ctx.fillText('PRODUTO', margem + 42, y);
+            ctx.textAlign = 'right';
+            ctx.fillText('UNIT.', largura - margem - 80, y);
+            ctx.fillText('SUBTOTAL', largura - margem, y);
+            ctx.textAlign = 'left';
+            y += 12;
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 20;
+
+            let subtotalProdutos = 0;
+            ctx.font = '13px Arial';
+            pedido.itens.forEach(item => {
+                const nomeItem = item.sabor_variacao ? `${item.nome} - ${item.sabor_variacao}` : item.nome;
+                const qtd = Number(item.quantidade || 0);
+                const precoUnit = Number(item.preco || 0);
+                const subtotalItem = qtd * precoUnit;
+                subtotalProdutos += subtotalItem;
+
+                const linhas = quebrarTexto(ctx, nomeItem, larguraUtil - 140);
+                ctx.fillStyle = '#111827';
+                ctx.fillText(String(qtd) + 'x', margem, y);
+                ctx.fillText(linhas[0] || '', margem + 42, y);
+                ctx.textAlign = 'right';
+                ctx.fillText(formatarMoeda(precoUnit), largura - margem - 80, y);
+                ctx.fillText(formatarMoeda(subtotalItem), largura - margem, y);
+                ctx.textAlign = 'left';
+
+                for (let i = 1; i < linhas.length; i++) {
+                    y += 18;
+                    ctx.fillText(linhas[i], margem + 42, y);
+                }
+                y += 26;
+            });
+
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 24;
+
+            const taxaEntrega = Number(pedido.taxa_entrega || 0);
+            ctx.font = '13px Arial';
+            ctx.fillStyle = '#374151';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Subtotal produtos: ${formatarMoeda(subtotalProdutos)}`, largura - margem, y);
+            y += 20;
+            if (taxaEntrega > 0) {
+                ctx.fillText(`Taxa de entrega: ${formatarMoeda(taxaEntrega)}`, largura - margem, y);
+                y += 20;
+            }
+
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#111827';
+            ctx.fillText(`TOTAL: ${formatarMoeda(pedido.valor_total)}`, largura - margem, y);
+            ctx.textAlign = 'left';
+            y += 32;
+
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#6b7280';
+            const formaPagamentoTexto = pedido.forma_pagamento === 'dinheiro' ? 'Dinheiro' : 'PIX';
+            ctx.fillText(`Forma de pagamento: ${formaPagamentoTexto}`, margem, y);
+            y += 18;
+            ctx.fillText(`Tipo de entrega: ${pedido.tipo_entrega === 'retirada' ? 'Retirada na loja' : 'Entrega'}`, margem, y);
+            y += 30;
+
+            ctx.textAlign = 'center';
+            ctx.font = 'italic 12px Arial';
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillText('Obrigado pela preferência!', largura / 2, y);
+            ctx.textAlign = 'left';
+
+            return canvas;
+        }
+
+        async function abrirNota(id) {
+            const pedido = pedidosCache.find(p => p.id === id);
+            if (!pedido) {
+                alert('Pedido não encontrado. Atualize a lista e tente novamente.');
+                return;
+            }
+
+            try {
+                const canvas = await desenharNota(pedido);
+                canvas.toBlob(blob => {
+                    notaBlobAtual = { blob, id: pedido.id };
+                    const url = URL.createObjectURL(blob);
+                    document.getElementById('nota-preview').src = url;
+                    document.getElementById('modal-nota').classList.remove('hidden');
+                }, 'image/png');
+            } catch (err) {
+                console.error('Erro ao gerar nota:', err);
+                alert('Não foi possível gerar a nota deste pedido.');
+            }
+        }
+
+        function fecharNota() {
+            document.getElementById('modal-nota').classList.add('hidden');
+        }
+
+        function baixarNota() {
+            if (!notaBlobAtual) return;
+            const url = URL.createObjectURL(notaBlobAtual.blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nota-pedido-${notaBlobAtual.id}.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+
+        async function compartilharNota() {
+            if (!notaBlobAtual) return;
+            const arquivo = new File([notaBlobAtual.blob], `nota-pedido-${notaBlobAtual.id}.png`, { type: 'image/png' });
+
+            if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+                try {
+                    await navigator.share({
+                        files: [arquivo],
+                        title: `Nota do Pedido #${notaBlobAtual.id}`,
+                        text: `Nota do pedido #${notaBlobAtual.id} - Master Distribuidora`
+                    });
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Erro ao compartilhar:', err);
+                        alert('Não foi possível compartilhar. Use o botão Baixar para salvar a imagem.');
+                    }
+                }
+            } else {
+                alert('Compartilhamento direto não é suportado neste navegador. A imagem será baixada para você compartilhar manualmente.');
+                baixarNota();
             }
         }
     </script>
