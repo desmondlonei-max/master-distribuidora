@@ -943,13 +943,7 @@
             try {
                 const logo = await carregarImagem('/logo.png');
                 const tamanhoLogo = 56;
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(margem + tamanhoLogo / 2, y + tamanhoLogo / 2, tamanhoLogo / 2, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.clip();
                 ctx.drawImage(logo, margem, y, tamanhoLogo, tamanhoLogo);
-                ctx.restore();
             } catch (e) {
                 console.warn('Não foi possível carregar a logo:', e);
             }
@@ -972,7 +966,7 @@
             // Dados do pedido
             ctx.fillStyle = '#111827';
             ctx.font = 'bold 14px Arial';
-            ctx.fillText(`Pedido #${pedido.id}`, margem, y);
+            ctx.fillText(`Pedido`, margem, y);
 
             ctx.font = '12px Arial';
             ctx.fillStyle = '#6b7280';
