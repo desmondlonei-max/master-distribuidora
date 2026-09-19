@@ -612,7 +612,7 @@ app.get('/pedidos', autenticarAdmin, async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
 
         const [pedidos] = await connection.execute(
-            'SELECT id, nome_cliente, telefone, endereco, valor_total, taxa_entrega, tipo_entrega, forma_pagamento, troco_para, status FROM pedidos ORDER BY id DESC'
+            'SELECT id, nome_cliente, telefone, endereco, valor_total, taxa_entrega, tipo_entrega, forma_pagamento, troco_para, status, data_criacao FROM pedidos ORDER BY id DESC'
         );
 
         const pedidosComItens = [];
