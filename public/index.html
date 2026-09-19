@@ -415,14 +415,14 @@
     </main>
 
 
-    <!-- ==================== CARRINHO ==================== -->
+        <!-- ==================== CARRINHO ==================== -->
     <div id="modal-carrinho"
          class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[60] hidden flex justify-end">
 
-        <div class="bg-white w-full sm:max-w-md h-full flex flex-col shadow-2xl">
+        <div class="bg-white w-full sm:max-w-md h-full flex flex-col shadow-2xl overflow-hidden">
 
             <!-- TOPO -->
-            <div class="px-5 sm:px-6 py-5 border-b border-slate-200 flex items-center justify-between bg-white">
+            <div class="px-5 sm:px-6 py-5 border-b border-slate-200 flex items-center justify-between bg-white flex-shrink-0">
 
                 <div>
 
@@ -457,176 +457,180 @@
             </div>
 
 
-            <!-- ITENS -->
-            <div class="flex-1 overflow-y-auto px-5 sm:px-6 py-5">
+            <!-- CONTEÚDO ROLÁVEL (itens + checkout/botão ficam juntos aqui) -->
+            <div class="flex-1 overflow-y-auto">
 
-                <div id="itens-carrinho" class="space-y-3">
+                <!-- ITENS -->
+                <div class="px-5 sm:px-6 py-5">
 
-                    <p class="text-slate-400 text-center py-10 text-sm">
-                        Seu carrinho está vazio.
-                    </p>
+                    <div id="itens-carrinho" class="space-y-3">
 
-                </div>
-
-            </div>
-
-
-            <!-- RODAPÉ -->
-            <div class="border-t border-slate-200 p-5 sm:p-6 bg-slate-50">
-
-                <div id="linha-taxa-entrega" class="hidden flex justify-between items-center mb-1.5 text-xs">
-                    <span class="text-slate-500 font-semibold">Taxa de entrega</span>
-                    <span class="text-slate-700 font-bold">+ R$ 5,00</span>
-                </div>
-
-                <div class="flex justify-between items-center mb-4">
-
-                    <span class="text-sm font-semibold text-slate-500">
-                        Total do pedido
-                    </span>
-
-                    <span id="total-carrinho"
-                          class="text-2xl font-black text-blue-600">
-                        R$ 0,00
-                    </span>
-
-                </div>
-
-
-                <form id="form-checkout" class="space-y-3 hidden">
-
-                    <div class="border-t border-slate-200 pt-4">
-
-                        <p class="text-xs uppercase tracking-wider text-blue-600 font-black mb-3">
-                            Dados do pedido
+                        <p class="text-slate-400 text-center py-10 text-sm">
+                            Seu carrinho está vazio.
                         </p>
 
                     </div>
 
-                    <input type="text"
-                           id="nome-cliente"
-                           required
-                           placeholder="Seu nome completo"
-                           class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                </div>
 
-                    <input type="text"
-                           id="telefone"
-                           required
-                           placeholder="Telefone / WhatsApp"
-                           class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
 
-                    <!-- COMO DESEJA RECEBER -->
-                    <div class="space-y-2">
+                <!-- RODAPÉ -->
+                <div class="border-t border-slate-200 p-5 sm:p-6 bg-slate-50">
 
-                        <p class="text-xs font-bold text-slate-600">
-                            Como deseja receber?
-                        </p>
-
-                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
-                            <input type="radio"
-                                   name="tipo_entrega"
-                                   id="tipo-entrega-entrega"
-                                   value="entrega"
-                                   checked
-                                   onchange="alternarTipoEntrega()"
-                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
-                            <span class="flex-1">Receber em casa (entrega)</span>
-                            <span class="text-blue-600 font-bold text-xs">+ R$ 5,00</span>
-                        </label>
-
-                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
-                            <input type="radio"
-                                   name="tipo_entrega"
-                                   id="tipo-entrega-retirada"
-                                   value="retirada"
-                                   onchange="alternarTipoEntrega()"
-                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
-                            <span class="flex-1">Retirar na loja</span>
-                            <span class="text-slate-400 font-bold text-xs">Grátis</span>
-                        </label>
-
+                    <div id="linha-taxa-entrega" class="hidden flex justify-between items-center mb-1.5 text-xs">
+                        <span class="text-slate-500 font-semibold">Taxa de entrega</span>
+                        <span class="text-slate-700 font-bold">+ R$ 5,00</span>
                     </div>
 
-                    <div id="bloco-endereco">
+                    <div class="flex justify-between items-center mb-4">
 
-                        <textarea id="endereco"
-                                  required
-                                  rows="3"
-                                  placeholder="Endereço completo (Rua, Número, Bairro, Cidade)"
-                                  class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
-
-                    </div>
-
-                    <!-- FORMA DE PAGAMENTO -->
-                    <div class="space-y-2">
-
-                        <p class="text-xs font-bold text-slate-600">
-                            Forma de pagamento
-                        </p>
-
-                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
-                            <input type="radio"
-                                   name="forma_pagamento"
-                                   id="pagamento-pix"
-                                   value="pix"
-                                   checked
-                                   onchange="alternarFormaPagamento()"
-                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
-                            <span class="flex-1">PIX</span>
-                        </label>
-
-                        <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
-                            <input type="radio"
-                                   name="forma_pagamento"
-                                   id="pagamento-dinheiro"
-                                   value="dinheiro"
-                                   onchange="alternarFormaPagamento()"
-                                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
-                            <span class="flex-1">Dinheiro (espécie)</span>
-                        </label>
-
-                    </div>
-
-                    <div id="bloco-troco" class="hidden">
-
-                        <input type="number"
-                               step="0.01"
-                               min="0"
-                               id="troco-para"
-                               placeholder="Precisa de troco? Para quanto? (opcional)"
-                               class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-
-                    </div>
-
-                    <div id="bloco-info-pagamento" class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
-
-                        <span class="font-black">
-                            Pagamento:
+                        <span class="text-sm font-semibold text-slate-500">
+                            Total do pedido
                         </span>
 
-                        PIX — a chave será exibida após finalizar.
+                        <span id="total-carrinho"
+                              class="text-2xl font-black text-blue-600">
+                            R$ 0,00
+                        </span>
 
                     </div>
 
-                    <button type="submit"
-                            id="btn-finalizar-pedido"
+
+                    <form id="form-checkout" class="space-y-3 hidden">
+
+                        <div class="border-t border-slate-200 pt-4">
+
+                            <p class="text-xs uppercase tracking-wider text-blue-600 font-black mb-3">
+                                Dados do pedido
+                            </p>
+
+                        </div>
+
+                        <input type="text"
+                               id="nome-cliente"
+                               required
+                               placeholder="Seu nome completo"
+                               class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+
+                        <input type="text"
+                               id="telefone"
+                               required
+                               placeholder="Telefone / WhatsApp"
+                               class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+
+                        <!-- COMO DESEJA RECEBER -->
+                        <div class="space-y-2">
+
+                            <p class="text-xs font-bold text-slate-600">
+                                Como deseja receber?
+                            </p>
+
+                            <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                                <input type="radio"
+                                       name="tipo_entrega"
+                                       id="tipo-entrega-entrega"
+                                       value="entrega"
+                                       checked
+                                       onchange="alternarTipoEntrega()"
+                                       class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                <span class="flex-1">Receber em casa (entrega)</span>
+                                <span class="text-blue-600 font-bold text-xs">+ R$ 5,00</span>
+                            </label>
+
+                            <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                                <input type="radio"
+                                       name="tipo_entrega"
+                                       id="tipo-entrega-retirada"
+                                       value="retirada"
+                                       onchange="alternarTipoEntrega()"
+                                       class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                <span class="flex-1">Retirar na loja</span>
+                                <span class="text-slate-400 font-bold text-xs">Grátis</span>
+                            </label>
+
+                        </div>
+
+                        <div id="bloco-endereco">
+
+                            <textarea id="endereco"
+                                      required
+                                      rows="3"
+                                      placeholder="Endereço completo (Rua, Número, Bairro, Cidade)"
+                                      class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+
+                        </div>
+
+                        <!-- FORMA DE PAGAMENTO -->
+                        <div class="space-y-2">
+
+                            <p class="text-xs font-bold text-slate-600">
+                                Forma de pagamento
+                            </p>
+
+                            <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                                <input type="radio"
+                                       name="forma_pagamento"
+                                       id="pagamento-pix"
+                                       value="pix"
+                                       checked
+                                       onchange="alternarFormaPagamento()"
+                                       class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                <span class="flex-1">PIX</span>
+                            </label>
+
+                            <label class="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm cursor-pointer">
+                                <input type="radio"
+                                       name="forma_pagamento"
+                                       id="pagamento-dinheiro"
+                                       value="dinheiro"
+                                       onchange="alternarFormaPagamento()"
+                                       class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                <span class="flex-1">Dinheiro (espécie)</span>
+                            </label>
+
+                        </div>
+
+                        <div id="bloco-troco" class="hidden">
+
+                            <input type="number"
+                                   step="0.01"
+                                   min="0"
+                                   id="troco-para"
+                                   placeholder="Precisa de troco? Para quanto? (opcional)"
+                                   class="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+
+                        </div>
+
+                        <div id="bloco-info-pagamento" class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
+
+                            <span class="font-black">
+                                Pagamento:
+                            </span>
+
+                            PIX — a chave será exibida após finalizar.
+
+                        </div>
+
+                        <button type="submit"
+                                id="btn-finalizar-pedido"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition shadow-lg shadow-blue-600/20">
+                            Finalizar pedido via PIX
+                        </button>
+
+                    </form>
+
+
+                    <button id="btn-ir-checkout"
+                            onclick="mostrarFormularioCheckout()"
                             class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition shadow-lg shadow-blue-600/20">
-                        Finalizar pedido via PIX
+                        Continuar para entrega
                     </button>
 
-                </form>
-
-
-                <button id="btn-ir-checkout"
-                        onclick="mostrarFormularioCheckout()"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition shadow-lg shadow-blue-600/20">
-                    Continuar para entrega
-                </button>
+                </div>
 
             </div>
         </div>
     </div>
-
 
     <!-- ==================== MODAL PIX ==================== -->
     <div id="modal-pix"
