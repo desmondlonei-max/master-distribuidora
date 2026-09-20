@@ -1439,7 +1439,7 @@
                                 </span>
 
                                 <span class="text-[11px] text-blue-800 font-semibold leading-relaxed">
-                                    Até 5un: R$ 4,00 un | 6un: R$ 20,00 | +10un: R$ 2,50 un
+                                    Até 5un: R$ 4,00 un | 6un: R$ 20,00 | +10un: R$ 2,50 un | +40un: R$ 2,00 un
                                 </span>
 
                             </div>
@@ -1751,7 +1751,11 @@
                     .filter(i => i.id === item.id && (i.eh_gelo_especial == 1 || i.eh_gelo_especial === true))
                     .reduce((soma, i) => soma + (parseInt(i.quantidade) || 0), 0);
 
-                if (qtd > 10) {
+                if (qtd > 40) {
+
+                    return 2.00;
+
+                } else if (qtd > 10) {
 
                     return 2.50;
 
