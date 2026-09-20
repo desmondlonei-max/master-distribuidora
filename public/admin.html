@@ -1068,6 +1068,1076 @@
             const formaPagamentoTexto = pedido.forma_pagamento === 'dinheiro' ? 'Dinheiro' : 'PIX';
             ctx.fillText(`Forma de pagamento: ${formaPagamentoTexto}`, margem, y);
             y += 18;
+            ctx.fillText(`Tipo de entrega: ${pedido.tipo_entrega === 'retirada' ? 'Retirada na loja' : 'Entrega'}`, margem, y);<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - Adega</title>
+    <!-- LOGO NA ABA DO NAVEGADOR -->
+    <link rel="icon" type="image/jpeg" href="/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen overflow-x-hidden">
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-screen" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full border border-gray-100">
+            <div class="text-center mb-6">
+                <!-- LOGO NO LOGIN -->
+                <img src="/logo.png" alt="Logo Adega" class="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full object-cover mb-3 shadow-md border border-gray-200">
+                <h2 class="text-xl sm:text-2xl font-bold text-gray-800">Painel Administrativo</h2>
+            </div>
+            <form onsubmit="fazerLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 text-xs sm:text-sm font-bold mb-2">Senha Mestre</label>
+                    <input type="password" id="senha-mestre" class="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-700 transition text-sm shadow-sm">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO DO PAINEL -->
+    <div id="painel-content" class="hidden">
+        <header class="bg-gray-900 text-white py-4 px-4 sm:px-6 flex justify-between items-center shadow sticky top-0 z-40">
+            <!-- LOGO E NOME NO TOPO DO PAINEL -->
+            <div class="flex items-center gap-3">
+                <img src="/logo.png" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border border-gray-700 shadow-sm">
+                <h1 class="text-base sm:text-xl font-bold truncate">Master Distribuidora - Admin</h1>
+            </div>
+            <button onclick="logout()" class="bg-red-600 px-3 py-1.5 rounded-lg text-xs sm:text-sm hover:bg-red-700 font-semibold transition">Sair</button>
+        </header>
+
+        <main class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
+
+            <!-- CARD DE RELATÓRIO SEMANAL -->
+            <div class="bg-blue-600 text-white p-4 sm:p-6 rounded-2xl shadow-lg grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="bg-blue-700/50 p-4 rounded-xl border border-blue-500/30">
+                    <span class="text-xs sm:text-sm uppercase tracking-wider text-blue-200 font-medium">Pedidos na Semana</span>
+                    <h3 id="rel-pedidos" class="text-2xl sm:text-3xl font-bold mt-1">0</h3>
+                </div>
+                <div class="bg-blue-700/50 p-4 rounded-xl border border-blue-500/30">
+                    <span class="text-xs sm:text-sm uppercase tracking-wider text-blue-200 font-medium">Faturamento Semanal</span>
+                    <h3 id="rel-faturamento" class="text-2xl sm:text-3xl font-bold mt-1">R$ 0,00</h3>
+                </div>
+                <div class="bg-blue-700/50 p-4 rounded-xl border border-blue-500/30">
+                    <span class="text-xs sm:text-sm uppercase tracking-wider text-blue-200 font-medium">Lucro Semanal</span>
+                    <h3 id="rel-lucro" class="text-2xl sm:text-3xl font-bold mt-1 text-emerald-300">R$ 0,00</h3>
+                </div>
+            </div>
+
+            <!-- GERENCIAR PRODUTOS -->
+            <section class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                <h2 id="titulo-form" class="text-base sm:text-lg font-bold mb-4 text-gray-800">Cadastrar Produto</h2>
+
+                <!-- SELETOR: PRODUTO ÚNICO x PRODUTO COM VARIAÇÕES -->
+                <div id="seletor-tipo-cadastro" class="flex flex-col sm:flex-row gap-2 mb-4">
+                    <button type="button" id="btn-tipo-unico" onclick="alternarTipoCadastro('unico')"
+                            class="flex-1 border-2 border-blue-600 bg-blue-600 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition">
+                        Produto Único
+                    </button>
+                    <button type="button" id="btn-tipo-variacoes" onclick="alternarTipoCadastro('variacoes')"
+                            class="flex-1 border-2 border-blue-200 bg-white text-blue-700 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition">
+                        Produto com Variações (Sabores)
+                    </button>
+                </div>
+
+                <form id="form-produto" onsubmit="salvarProduto(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="hidden" id="produto-id">
+
+                    <!-- CAMPOS COMUNS (produto base) -->
+                    <input type="text" id="nome" placeholder="Nome do Produto (Ex: Vodka Marca X)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <input type="text" id="marca" placeholder="Marca" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="flex gap-1">
+                        <select id="categoria_id" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                        <button type="button" onclick="criarNovaCategoria()" title="Nova categoria" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm rounded-xl px-3">+</button>
+                    </div>
+                    <input type="text" id="volume" placeholder="Volume (ex: 200g)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" step="0.1" id="teor_alcoolico" placeholder="Teor Alcoólico (%)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+                    <!-- CAMPOS EXCLUSIVOS DE PRODUTO ÚNICO -->
+                    <div id="campos-produto-unico" class="contents">
+                        <input type="number" step="0.01" id="preco" placeholder="Preço Padrão / Unidade (R$)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" step="0.01" id="preco_atacado" placeholder="Preço Atacado / Pacote (R$)" class="border rounded-xl px-3 py-2 text-sm bg-blue-50/50 border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" step="0.01" id="preco_custo" placeholder="Preço de Custo (R$)" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="estoque" placeholder="Estoque Disponível" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="imagem" placeholder="URL da Imagem" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="status" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="disponivel">Disponível</option>
+                            <option value="poucas_unidades">Poucas Unidades</option>
+                            <option value="esgotado">Esgotado</option>
+                        </select>
+                    </div>
+
+                    <!-- CAMPO: TIPO ESPECIAL DE PRODUTO (GELO) -->
+                    <div class="md:col-span-3 flex items-center gap-2 bg-purple-50 border border-purple-200 p-3 rounded-xl">
+                        <input type="checkbox" id="eh_gelo_especial" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                        <label for="eh_gelo_especial" class="text-xs sm:text-sm font-semibold text-purple-950 cursor-pointer">Gelo Especial: (1-5 un: R$ 4,00/cada | 6-10 un: R$ 3,33/cada | >10 un: R$ 2,50/cada | >40 un: R$ 2,00/cada)</label>
+                    </div>
+
+                    <!-- CAMPO: DESTAQUE NA VITRINE -->
+                    <div class="md:col-span-3 flex items-center gap-2 bg-gray-50 border border-gray-200 p-3 rounded-xl">
+                        <input type="checkbox" id="destaque" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="destaque" class="text-xs sm:text-sm font-semibold text-gray-700 cursor-pointer">Exibir nas Ofertas / Destaques da Página Inicial 🔥</label>
+                    </div>
+
+                    <textarea id="descricao" placeholder="Descrição" class="border border-gray-300 rounded-xl px-3 py-2 text-sm md:col-span-3 focus:outline-none focus:ring-2 focus:ring-blue-500" rows="2"></textarea>
+
+                    <!-- BLOCO DE VARIAÇÕES (SABORES) - só aparece no modo "Produto com Variações" -->
+                    <div id="bloco-variacoes" class="hidden md:col-span-3 border-2 border-dashed border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-blue-900">Sabores deste produto</h3>
+                            <button type="button" onclick="adicionarLinhaVariacao()" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700">+ Adicionar sabor</button>
+                        </div>
+                        <div id="lista-linhas-variacao" class="space-y-3"></div>
+                        <p class="text-[11px] text-blue-800/70">Cada sabor tem estoque, preço e imagem próprios — como se fosse um produto individual.</p>
+                    </div>
+
+                    <div class="md:col-span-3 flex flex-col sm:flex-row gap-2 pt-2">
+                        <button type="submit" id="btn-salvar-produto" class="bg-green-600 text-white px-5 py-2.5 rounded-xl hover:bg-green-700 font-bold transition text-sm shadow-sm">Salvar Produto</button>
+                        <button type="button" id="btn-cancelar" onclick="limparFormulario()" class="hidden bg-gray-500 text-white px-5 py-2.5 rounded-xl hover:bg-gray-600 font-semibold transition text-sm">Cancelar</button>
+                    </div>
+                </form>
+
+                <div class="mt-8 overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
+                        <thead>
+                            <tr class="border-b bg-gray-50 text-xs sm:text-sm text-gray-600">
+                                <th class="p-3">Nome</th>
+                                <th class="p-3">Preço Padrão</th>
+                                <th class="p-3">Preço Atacado</th>
+                                <th class="p-3">Regra Especial</th>
+                                <th class="p-3">Estoque</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-produtos" class="text-xs sm:text-sm"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- HISTÓRICO DE PEDIDOS -->
+            <section class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                <h2 class="text-base sm:text-lg font-bold mb-4 text-gray-800">Histórico de Pedidos</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[750px]">
+                        <thead>
+                            <tr class="border-b bg-gray-50 text-xs sm:text-sm text-gray-600">
+                                <th class="p-3">Cliente</th>
+                                <th class="p-3">Endereço / Contato</th>
+                                <th class="p-3">Itens</th>
+                                <th class="p-3">Total</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-pedidos" class="text-xs sm:text-sm"></tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL DE NOTA DO PEDIDO -->
+    <div id="modal-nota" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-gray-100 overflow-hidden">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-gray-800">Nota do Pedido</h3>
+                <button onclick="fecharNota()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+            <div class="p-4 max-h-[70vh] overflow-y-auto flex justify-center bg-gray-50">
+                <img id="nota-preview" class="w-full rounded-lg shadow border border-gray-200" alt="Nota do pedido">
+            </div>
+            <div class="p-4 border-t grid grid-cols-2 gap-3">
+                <button onclick="baixarNota()" class="bg-gray-800 text-white font-semibold py-2.5 rounded-xl hover:bg-gray-900 transition text-sm">Baixar</button>
+                <button onclick="compartilharNota()" class="bg-blue-600 text-white font-semibold py-2.5 rounded-xl hover:bg-blue-700 transition text-sm">Compartilhar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        let pedidosCache = [];
+        let adminToken = sessionStorage.getItem('admin_token') || '';
+
+        async function apiFetch(url, options = {}) {
+            const headers = { ...(options.headers || {}) };
+            if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+            return fetch(url, { ...options, headers });
+        }
+        let produtosCache = [];
+        let tipoCadastro = 'unico'; // 'unico' | 'variacoes'
+        let contadorLinhaVariacao = 0;
+
+        // ==========================================
+        // CADASTRO AGRUPADO (PRODUTO + VARIAÇÕES/SABORES)
+        // ==========================================
+
+        function alternarTipoCadastro(tipo) {
+            tipoCadastro = tipo;
+
+            const btnUnico = document.getElementById('btn-tipo-unico');
+            const btnVariacoes = document.getElementById('btn-tipo-variacoes');
+            const camposUnico = document.getElementById('campos-produto-unico');
+            const blocoVariacoes = document.getElementById('bloco-variacoes');
+            const camposUnicoInputs = camposUnico.querySelectorAll('input, select');
+
+            if (tipo === 'unico') {
+                btnUnico.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                btnUnico.classList.remove('bg-white', 'text-blue-700', 'border-blue-200');
+                btnVariacoes.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                btnVariacoes.classList.add('bg-white', 'text-blue-700', 'border-blue-200');
+
+                camposUnico.classList.remove('hidden');
+                blocoVariacoes.classList.add('hidden');
+
+                camposUnicoInputs.forEach(el => {
+                    if (el.id === 'preco' || el.id === 'preco_custo' || el.id === 'estoque' || el.id === 'imagem') {
+                        el.setAttribute('required', 'required');
+                    }
+                });
+            } else {
+                btnVariacoes.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                btnVariacoes.classList.remove('bg-white', 'text-blue-700', 'border-blue-200');
+                btnUnico.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                btnUnico.classList.add('bg-white', 'text-blue-700', 'border-blue-200');
+
+                camposUnico.classList.add('hidden');
+                blocoVariacoes.classList.remove('hidden');
+
+                camposUnicoInputs.forEach(el => el.removeAttribute('required'));
+
+                if (document.getElementById('lista-linhas-variacao').children.length === 0) {
+                    adicionarLinhaVariacao();
+                    adicionarLinhaVariacao();
+                }
+            }
+        }
+
+        function adicionarLinhaVariacao(valores = {}) {
+            contadorLinhaVariacao++;
+            const linhaId = `linha-variacao-${contadorLinhaVariacao}`;
+
+            const div = document.createElement('div');
+            div.id = linhaId;
+            div.className = 'bg-white border border-blue-100 rounded-lg p-3 space-y-2';
+            div.innerHTML = `
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <input type="text" placeholder="Sabor (ex: Melancia)" data-campo="sabor" value="${valores.sabor || ''}" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="text" placeholder="URL da imagem" data-campo="imagem" value="${valores.imagem || ''}" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    <input type="number" step="0.01" placeholder="Preço Varejo (R$)" data-campo="preco" value="${valores.preco || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" placeholder="Preço Atacado (R$)" data-campo="preco_atacado" value="${valores.preco_atacado || ''}" class="border border-blue-200 bg-blue-50/50 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" placeholder="Preço Custo (R$)" data-campo="preco_custo" value="${valores.preco_custo || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" step="0.01" placeholder="Preço Promo (R$)" data-campo="preco_promocional" value="${valores.preco_promocional || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    <input type="number" placeholder="Estoque" data-campo="estoque" value="${valores.estoque || ''}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <select data-campo="status" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <option value="disponivel" ${(!valores.status || valores.status === 'disponivel') ? 'selected' : ''}>Disponível</option>
+                        <option value="poucas_unidades" ${valores.status === 'poucas_unidades' ? 'selected' : ''}>Poucas Unidades</option>
+                        <option value="esgotado" ${valores.status === 'esgotado' ? 'selected' : ''}>Esgotado</option>
+                    </select>
+                    <button type="button" onclick="document.getElementById('${linhaId}').remove()" class="bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold py-1.5">Remover sabor</button>
+                </div>
+            `;
+
+            document.getElementById('lista-linhas-variacao').appendChild(div);
+        }
+
+        function lerLinhasVariacao() {
+            const linhas = document.querySelectorAll('#lista-linhas-variacao > div');
+            const variacoes = [];
+
+            linhas.forEach(linha => {
+                const sabor = linha.querySelector('[data-campo="sabor"]').value.trim();
+                const preco = parseFloat(linha.querySelector('[data-campo="preco"]').value);
+                const preco_atacado = parseFloat(linha.querySelector('[data-campo="preco_atacado"]').value) || 0;
+                const preco_custo = parseFloat(linha.querySelector('[data-campo="preco_custo"]').value) || 0;
+                const preco_promocional = parseFloat(linha.querySelector('[data-campo="preco_promocional"]').value) || null;
+                const estoque = parseInt(linha.querySelector('[data-campo="estoque"]').value) || 0;
+                const imagem = linha.querySelector('[data-campo="imagem"]').value.trim() || null;
+                const status = linha.querySelector('[data-campo="status"]').value;
+
+                if (sabor && !isNaN(preco)) {
+                    variacoes.push({ sabor, preco, preco_atacado, preco_custo, preco_promocional, estoque, imagem, status });
+                }
+            });
+
+            return variacoes;
+        }
+
+        // ==========================================
+        // CATEGORIAS
+        // ==========================================
+
+        async function carregarCategorias(categoriaSelecionada = null) {
+            try {
+                const res = await apiFetch(`${API_URL}/categorias`);
+                const categorias = await res.json();
+
+                const select = document.getElementById('categoria_id');
+                select.innerHTML = categorias.map(c =>
+                    `<option value="${c.id}">${c.nome}</option>`
+                ).join('');
+
+                if (categoriaSelecionada) {
+                    select.value = categoriaSelecionada;
+                }
+            } catch (err) {
+                console.error('Erro ao carregar categorias:', err);
+            }
+        }
+
+        async function criarNovaCategoria() {
+            const nome = prompt('Nome da nova categoria (ex: Whiskys, Energéticos, Vodkas):');
+            if (!nome || !nome.trim()) return;
+
+            try {
+                const res = await apiFetch(`${API_URL}/categorias`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome })
+                });
+
+                const resultado = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    await carregarCategorias(resultado.id);
+                } else {
+                    alert('Erro ao criar categoria: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao criar categoria:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem('admin_logado') === 'true') {
+                mostrarPainel();
+            }
+        });
+
+        async function fazerLogin(e) {
+            e.preventDefault();
+            const senha = document.getElementById('senha-mestre').value;
+            try {
+                const res = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ senha })
+                });
+                const dados = await res.json();
+                if (!res.ok) throw new Error(dados.erro || 'Senha incorreta!');
+                adminToken = dados.token;
+                sessionStorage.setItem('admin_token', adminToken);
+                sessionStorage.setItem('admin_logado', 'true');
+                mostrarPainel();
+            } catch (err) {
+                alert(err.message || 'Erro ao fazer login.');
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('admin_logado');
+            sessionStorage.removeItem('admin_token');
+            adminToken = '';
+            location.reload();
+        }
+
+        function mostrarPainel() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('painel-content').classList.remove('hidden');
+            carregarCategorias();
+            carregarRelatorioSemanal();
+            carregarProdutos();
+            carregarPedidos();
+        }
+
+        async function carregarRelatorioSemanal() {
+            try {
+                const res = await apiFetch(`${API_URL}/relatorio-semanal`);
+                const dados = await res.json();
+                
+                const totalPedidos = Number(dados.total_pedidos) || 0;
+                const faturamento = Number(dados.faturamento) || 0;
+                const lucro = Number(dados.lucro) || 0;
+
+                document.getElementById('rel-pedidos').textContent = totalPedidos;
+                document.getElementById('rel-faturamento').textContent = `R$ ${faturamento.toFixed(2).replace('.', ',')}`;
+                document.getElementById('rel-lucro').textContent = `R$ ${lucro.toFixed(2).replace('.', ',')}`;
+            } catch (err) {
+                console.error('Erro ao carregar relatório:', err);
+                document.getElementById('rel-pedidos').textContent = '0';
+                document.getElementById('rel-faturamento').textContent = 'R$ 0,00';
+                document.getElementById('rel-lucro').textContent = 'R$ 0,00';
+            }
+        }
+
+        async function carregarProdutos() {
+            try {
+                const res = await apiFetch(`${API_URL}/produtos`);
+                produtosCache = await res.json();
+                const tbody = document.getElementById('tabela-produtos');
+                tbody.innerHTML = '';
+
+                produtosCache.forEach(p => {
+                    const badgeGelo = (p.eh_gelo_especial === 1 || p.eh_gelo_especial === true)
+                        ? '<span class="bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">🧊 Gelo Especial</span>'
+                        : '<span class="text-gray-400 text-xs">-</span>';
+
+                    const temVariacoes = p.possui_variacoes && Array.isArray(p.variacoes) && p.variacoes.length > 0;
+
+                    if (temVariacoes) {
+                        const estoqueTotal = p.variacoes.reduce((soma, v) => soma + Number(v.estoque || 0), 0);
+                        const precoMin = Math.min(...p.variacoes.map(v => Number(v.preco)));
+                        const precoMax = Math.max(...p.variacoes.map(v => Number(v.preco)));
+                        const faixaPreco = precoMin === precoMax
+                            ? `R$ ${precoMin.toFixed(2).replace('.', ',')}`
+                            : `R$ ${precoMin.toFixed(2).replace('.', ',')} - R$ ${precoMax.toFixed(2).replace('.', ',')}`;
+
+                        tbody.innerHTML += `
+                            <tr class="border-b hover:bg-gray-50/50 bg-blue-50/30">
+                                <td class="p-3 font-medium text-gray-900">
+                                    ${p.nome}
+                                    <span class="ml-2 bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">${p.variacoes.length} sabor(es)</span>
+                                </td>
+                                <td class="p-3 font-semibold">${faixaPreco}</td>
+                                <td class="p-3 text-blue-600 font-semibold">-</td>
+                                <td class="p-3">${badgeGelo}</td>
+                                <td class="p-3">${estoqueTotal} (total)</td>
+                                <td class="p-3">-</td>
+                                <td class="p-3 text-right space-x-2 whitespace-nowrap">
+                                    <button onclick="alternarSabores(${p.id})" class="text-blue-600 hover:underline font-semibold">Ver sabores</button>
+                                    <button onclick="excluirProduto(${p.id})" class="text-red-600 hover:underline font-semibold">Excluir</button>
+                                </td>
+                            </tr>
+                            <tr id="linha-sabores-${p.id}" class="hidden border-b">
+                                <td colspan="7" class="p-3 bg-gray-50">
+                                    <div id="conteudo-sabores-${p.id}"></div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        tbody.innerHTML += `
+                            <tr class="border-b hover:bg-gray-50/50">
+                                <td class="p-3 font-medium text-gray-900">${p.nome}</td>
+                                <td class="p-3 font-semibold">R$ ${Number(p.preco || 0).toFixed(2).replace('.', ',')}</td>
+                                <td class="p-3 text-blue-600 font-semibold">R$ ${Number(p.preco_atacado || 0).toFixed(2).replace('.', ',')}</td>
+                                <td class="p-3">${badgeGelo}</td>
+                                <td class="p-3">${p.estoque}</td>
+                                <td class="p-3">${p.status}</td>
+                                <td class="p-3 text-right space-x-2 whitespace-nowrap">
+                                    <button onclick="editarProduto(${p.id})" class="text-blue-600 hover:underline font-semibold">Editar</button>
+                                    <button onclick="excluirProduto(${p.id})" class="text-red-600 hover:underline font-semibold">Excluir</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+            } catch (err) {
+                console.error('Erro ao carregar produtos:', err);
+            }
+        }
+
+        // ==========================================
+        // GESTÃO DE SABORES (VARIAÇÕES) NO ADMIN
+        // ==========================================
+
+        function alternarSabores(produtoId) {
+            const linha = document.getElementById(`linha-sabores-${produtoId}`);
+            const estaAberta = !linha.classList.contains('hidden');
+
+            if (estaAberta) {
+                linha.classList.add('hidden');
+                return;
+            }
+
+            linha.classList.remove('hidden');
+            renderizarSabores(produtoId);
+        }
+
+        function renderizarSabores(produtoId) {
+            const p = produtosCache.find(prod => prod.id === produtoId);
+            if (!p) return;
+
+            const container = document.getElementById(`conteudo-sabores-${produtoId}`);
+
+            const linhasHtml = p.variacoes.map(v => `
+                <div class="bg-white border border-gray-200 rounded-lg p-3 space-y-2" id="variacao-${v.id}">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <input type="text" value="${v.sabor}" data-campo="sabor" placeholder="Sabor" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="text" value="${v.imagem || ''}" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        <input type="number" step="0.01" value="${v.preco}" data-campo="preco" placeholder="Preço Varejo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" value="${v.preco_atacado || ''}" data-campo="preco_atacado" placeholder="Preço Atacado" class="border border-blue-200 bg-blue-50/50 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" value="${v.preco_custo || ''}" data-campo="preco_custo" placeholder="Preço Custo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" value="${v.preco_promocional || ''}" data-campo="preco_promocional" placeholder="Preço Promo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" value="${v.estoque}" data-campo="estoque" placeholder="Estoque" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                        <select data-campo="status" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                            <option value="disponivel" ${v.status === 'disponivel' ? 'selected' : ''}>Disponível</option>
+                            <option value="poucas_unidades" ${v.status === 'poucas_unidades' ? 'selected' : ''}>Poucas Unidades</option>
+                            <option value="esgotado" ${v.status === 'esgotado' ? 'selected' : ''}>Esgotado</option>
+                        </select>
+                        <div class="col-span-2 md:col-span-3 flex gap-1">
+                            <button onclick="salvarVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-green-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-green-700">Salvar</button>
+                            <button onclick="excluirVariacaoInline(${produtoId}, ${v.id})" class="flex-1 bg-red-50 text-red-600 text-xs font-bold rounded-lg py-1.5 hover:bg-red-100">Excluir</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="space-y-2 mb-3">${linhasHtml}</div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2" id="nova-variacao-${produtoId}">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <input type="text" data-campo="sabor" placeholder="Novo sabor" class="col-span-2 md:col-span-2 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="text" data-campo="imagem" placeholder="URL imagem" class="col-span-2 md:col-span-2 border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        <input type="number" step="0.01" data-campo="preco" placeholder="Preço Varejo" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" data-campo="preco_atacado" placeholder="Preço Atacado" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" data-campo="preco_custo" placeholder="Preço Custo" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" step="0.01" data-campo="preco_promocional" placeholder="Preço Promo" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                        <input type="number" data-campo="estoque" placeholder="Estoque" class="border border-blue-300 rounded-lg px-2 py-1.5 text-xs">
+                    </div>
+                    <button onclick="adicionarSaborExistente(${produtoId})" class="w-full bg-blue-600 text-white text-xs font-bold rounded-lg py-1.5 hover:bg-blue-700">+ Adicionar sabor</button>
+                </div>
+            `;
+        }
+
+        function lerCamposVariacao(elemento) {
+            return {
+                sabor: elemento.querySelector('[data-campo="sabor"]').value,
+                preco: parseFloat(elemento.querySelector('[data-campo="preco"]').value) || 0,
+                preco_atacado: parseFloat(elemento.querySelector('[data-campo="preco_atacado"]').value) || 0,
+                preco_custo: parseFloat(elemento.querySelector('[data-campo="preco_custo"]').value) || 0,
+                preco_promocional: parseFloat(elemento.querySelector('[data-campo="preco_promocional"]').value) || null,
+                estoque: parseInt(elemento.querySelector('[data-campo="estoque"]').value) || 0,
+                imagem: elemento.querySelector('[data-campo="imagem"]').value || null,
+                status: elemento.querySelector('[data-campo="status"]') ? elemento.querySelector('[data-campo="status"]').value : 'disponivel'
+            };
+        }
+
+        async function salvarVariacaoInline(produtoId, variacaoId) {
+            const linha = document.getElementById(`variacao-${variacaoId}`);
+            const dados = lerCamposVariacao(linha);
+
+            try {
+                const res = await apiFetch(`${API_URL}/produto-variacoes/${variacaoId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const resultado = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    await carregarProdutos();
+                    document.getElementById(`linha-sabores-${produtoId}`).classList.remove('hidden');
+                    renderizarSabores(produtoId);
+                } else {
+                    alert('Erro ao salvar sabor: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao salvar variação:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        async function excluirVariacaoInline(produtoId, variacaoId) {
+            if (!confirm('Deseja realmente excluir este sabor?')) return;
+
+            try {
+                const res = await apiFetch(`${API_URL}/produto-variacoes/${variacaoId}`, { method: 'DELETE' });
+
+                if (res.ok) {
+                    await carregarProdutos();
+                    document.getElementById(`linha-sabores-${produtoId}`).classList.remove('hidden');
+                    renderizarSabores(produtoId);
+                } else {
+                    const resultado = await res.json().catch(() => ({}));
+                    alert('Erro ao excluir sabor: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao excluir variação:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        async function adicionarSaborExistente(produtoId) {
+            const bloco = document.getElementById(`nova-variacao-${produtoId}`);
+            const dados = lerCamposVariacao(bloco);
+
+            if (!dados.sabor.trim()) {
+                alert('Informe o nome do sabor.');
+                return;
+            }
+
+            try {
+                const res = await apiFetch(`${API_URL}/produtos/${produtoId}/variacoes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const resultado = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    await carregarProdutos();
+                    document.getElementById(`linha-sabores-${produtoId}`).classList.remove('hidden');
+                    renderizarSabores(produtoId);
+                } else {
+                    alert('Erro ao adicionar sabor: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro ao adicionar variação:', err);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        async function salvarProduto(e) {
+            e.preventDefault();
+            const id = document.getElementById('produto-id').value;
+
+            // Modo "Produto com Variações": só usado no cadastro (não na edição)
+            if (tipoCadastro === 'variacoes' && !id) {
+                const variacoes = lerLinhasVariacao();
+
+                if (variacoes.length === 0) {
+                    alert('Adicione ao menos um sabor com nome e preço válidos.');
+                    return;
+                }
+
+                const dadosAgrupado = {
+                    nome: document.getElementById('nome').value,
+                    marca: document.getElementById('marca').value || null,
+                    volume: document.getElementById('volume').value || null,
+                    teor_alcoolico: parseFloat(document.getElementById('teor_alcoolico').value) || null,
+                    descricao: document.getElementById('descricao').value || null,
+                    destaque: document.getElementById('destaque').checked ? 1 : 0,
+                    eh_gelo_especial: document.getElementById('eh_gelo_especial').checked ? 1 : 0,
+                    categoria_id: parseInt(document.getElementById('categoria_id').value) || null,
+                    variacoes
+                };
+
+                try {
+                    const res = await apiFetch(`${API_URL}/produtos/agrupado`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dadosAgrupado)
+                    });
+
+                    const respostaJson = await res.json().catch(() => ({}));
+
+                    if (res.ok) {
+                        alert(respostaJson.mensagem || 'Produto com variações cadastrado com sucesso!');
+                        limparFormulario();
+                        carregarProdutos();
+                        carregarRelatorioSemanal();
+                    } else {
+                        alert('Erro ao cadastrar produto: ' + (respostaJson.erro || 'Erro desconhecido no servidor'));
+                    }
+                } catch (err) {
+                    console.error('Erro de conexão:', err);
+                    alert('Não foi possível conectar ao servidor. Verifique se o Node.js está rodando.');
+                }
+
+                return;
+            }
+
+            // Modo "Produto Único" (cadastro ou edição de produto sem variações)
+            const dados = {
+                nome: document.getElementById('nome').value,
+                marca: document.getElementById('marca').value || null,
+                preco: parseFloat(document.getElementById('preco').value) || 0,
+                preco_atacado: parseFloat(document.getElementById('preco_atacado').value) || 0,
+                preco_custo: parseFloat(document.getElementById('preco_custo').value) || 0,
+                estoque: parseInt(document.getElementById('estoque').value) || 0,
+                volume: document.getElementById('volume').value || null,
+                teor_alcoolico: parseFloat(document.getElementById('teor_alcoolico').value) || 0,
+                imagem: document.getElementById('imagem').value,
+                status: document.getElementById('status').value,
+                destaque: document.getElementById('destaque').checked ? 1 : 0,
+                eh_gelo_especial: document.getElementById('eh_gelo_especial').checked ? 1 : 0,
+                descricao: document.getElementById('descricao').value || null,
+                categoria_id: parseInt(document.getElementById('categoria_id').value) || null
+            };
+
+            const metodo = id ? 'PUT' : 'POST';
+            const url = id ? `${API_URL}/produtos/${id}` : `${API_URL}/produtos`;
+
+            try {
+                const res = await apiFetch(url, {
+                    method: metodo,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const respostaJson = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    alert(respostaJson.mensagem || 'Produto salvo com sucesso!');
+                    limparFormulario();
+                    carregarProdutos();
+                    carregarRelatorioSemanal();
+                } else {
+                    alert('Erro ao salvar produto: ' + (respostaJson.erro || 'Erro desconhecido no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro de conexão:', err);
+                alert('Não foi possível conectar ao servidor. Verifique se o Node.js está rodando.');
+            }
+        }
+
+        function editarProduto(id) {
+            const p = produtosCache.find(prod => prod.id === id);
+            if (!p) return;
+
+            if (p.possui_variacoes) {
+                alert('Este produto tem variações (sabores). Edite nome/marca ou gerencie cada sabor diretamente na tabela abaixo, em "Ver sabores".');
+                return;
+            }
+
+            alternarTipoCadastro('unico');
+            document.getElementById('seletor-tipo-cadastro').classList.add('hidden');
+
+            document.getElementById('produto-id').value = p.id;
+            document.getElementById('nome').value = p.nome;
+            document.getElementById('marca').value = p.marca || '';
+            document.getElementById('categoria_id').value = p.categoria_id || '';
+            document.getElementById('preco').value = p.preco;
+            document.getElementById('preco_atacado').value = p.preco_atacado || '';
+            document.getElementById('preco_custo').value = p.preco_custo || 0;
+            document.getElementById('estoque').value = p.estoque;
+            document.getElementById('volume').value = p.volume || '';
+            document.getElementById('teor_alcoolico').value = p.teor_alcoolico || '';
+            document.getElementById('imagem').value = p.imagem;
+            document.getElementById('status').value = p.status;
+            document.getElementById('destaque').checked = (p.destaque === 1 || p.destaque === true);
+            document.getElementById('eh_gelo_especial').checked = (p.eh_gelo_especial === 1 || p.eh_gelo_especial === true);
+            document.getElementById('descricao').value = p.descricao || '';
+
+            document.getElementById('titulo-form').textContent = 'Editar Produto';
+            document.getElementById('btn-cancelar').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function limparFormulario() {
+            document.getElementById('form-produto').reset();
+            document.getElementById('produto-id').value = '';
+            document.getElementById('lista-linhas-variacao').innerHTML = '';
+            document.getElementById('titulo-form').textContent = 'Cadastrar Produto';
+            document.getElementById('btn-cancelar').classList.add('hidden');
+            document.getElementById('seletor-tipo-cadastro').classList.remove('hidden');
+            alternarTipoCadastro('unico');
+        }
+
+        async function excluirProduto(id) {
+            if (!confirm('Deseja realmente excluir este produto?')) return;
+            
+            try {
+                const res = await apiFetch(`${API_URL}/produtos/${id}`, { 
+                    method: 'DELETE' 
+                });
+                
+                if (res.ok) {
+                    carregarProdutos();
+                    carregarRelatorioSemanal();
+                } else {
+                    const resultado = await res.json().catch(() => ({}));
+                    alert('Erro ao excluir produto: ' + (resultado.erro || 'Erro no servidor'));
+                }
+            } catch (err) {
+                console.error('Erro de conexão ao excluir produto:', err);
+                alert('Não foi possível conectar ao servidor para excluir o produto.');
+            }
+        }
+
+        async function carregarPedidos() {
+            try {
+                const res = await apiFetch(`${API_URL}/pedidos`);
+                const pedidos = await res.json();
+                pedidosCache = pedidos;
+                const tbody = document.getElementById('tabela-pedidos');
+                tbody.innerHTML = '';
+
+                pedidos.forEach(ped => {
+                    const itensTexto = ped.itens.map(i => `${i.quantidade}x ${i.nome}`).join('<br>');
+                    
+                    let corStatus = 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                    if (ped.status === 'pago') corStatus = 'bg-blue-100 text-blue-800 border-blue-300';
+                    if (ped.status === 'enviado') corStatus = 'bg-purple-100 text-purple-800 border-purple-300';
+                    if (ped.status === 'entregue') corStatus = 'bg-green-100 text-green-800 border-green-300';
+                    if (ped.status === 'cancelado') corStatus = 'bg-red-100 text-red-800 border-red-300';
+
+                    const badgeTipoEntrega =
+                        ped.tipo_entrega === 'retirada'
+                            ? '<span class="inline-block bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full">🏬 Retirada na loja</span>'
+                            : '<span class="inline-block bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">🛵 Entrega</span>';
+
+                    const badgePagamento =
+                        ped.forma_pagamento === 'dinheiro'
+                            ? `<span class="inline-block bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">💵 Dinheiro${Number(ped.troco_para || 0) > 0 ? ` (troco p/ R$ ${Number(ped.troco_para).toFixed(2).replace('.', ',')})` : ''}</span>`
+                            : '<span class="inline-block bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">💳 PIX</span>';
+
+                    tbody.innerHTML += `
+                        <tr class="border-b hover:bg-gray-50/50">
+                            <td class="p-3 font-semibold text-gray-900">
+                                ${ped.nome_cliente}
+                                <div class="flex flex-wrap gap-1 mt-1">${badgeTipoEntrega}${badgePagamento}</div>
+                            </td>
+                            <td class="p-3 text-xs text-gray-600">${ped.telefone}<br>${ped.endereco}</td>
+                            <td class="p-3 text-xs">${itensTexto}</td>
+                            <td class="p-3 font-semibold">
+                                R$ ${Number(ped.valor_total || 0).toFixed(2).replace('.', ',')}
+                                ${Number(ped.taxa_entrega || 0) > 0 ? `<span class="block text-[10px] font-normal text-blue-600">+ R$ ${Number(ped.taxa_entrega).toFixed(2).replace('.', ',')} entrega</span>` : ''}
+                            </td>
+                            <td class="p-3">
+                                <select onchange="atualizarStatus(${ped.id}, this.value)" class="border rounded-lg p-1.5 text-xs font-semibold cursor-pointer transition-colors duration-200 ${corStatus}">
+                                    <option value="pendente" ${ped.status === 'pendente' ? 'selected' : ''} class="bg-white text-gray-800">Pendente</option>
+                                    <option value="pago" ${ped.status === 'pago' ? 'selected' : ''} class="bg-white text-gray-800">Pago</option>
+                                    <option value="enviado" ${ped.status === 'enviado' ? 'selected' : ''} class="bg-white text-gray-800">Enviado</option>
+                                    <option value="entregue" ${ped.status === 'entregue' ? 'selected' : ''} class="bg-white text-gray-800">Entregue</option>
+                                    <option value="cancelado" ${ped.status === 'cancelado' ? 'selected' : ''} class="bg-white text-gray-800">Cancelado</option>
+                                </select>
+                            </td>
+                            <td class="p-3 text-right whitespace-nowrap space-x-2">
+                                <button onclick="abrirNota(${ped.id})" class="text-blue-600 hover:underline font-semibold">Gerar Nota</button>
+                                <button onclick="excluirPedido(${ped.id})" class="text-red-600 hover:uideline font-semibold">Excluir</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.error('Erro ao carregar pedidos:', err);
+            }
+        }
+
+        async function atualizarStatus(id, status) {
+            const res = await apiFetch(`${API_URL}/pedidos/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (res.ok) {
+                carregarPedidos();
+                carregarRelatorioSemanal();
+            }
+        }
+
+        async function excluirPedido(id) {
+            if (!confirm('Deseja excluir este pedido?')) return;
+            const res = await apiFetch(`${API_URL}/pedidos/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                carregarPedidos();
+                carregarRelatorioSemanal();
+            }
+        }
+
+        // ==========================================
+        // GERAÇÃO DA NOTA DO PEDIDO (IMAGEM)
+        // ==========================================
+        let notaBlobAtual = null;
+
+        function carregarImagem(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        function quebrarTexto(ctx, texto, maxLargura) {
+            const palavras = String(texto).split(' ');
+            const linhas = [];
+            let linhaAtual = '';
+            palavras.forEach(palavra => {
+                const teste = linhaAtual ? `${linhaAtual} ${palavra}` : palavra;
+                if (ctx.measureText(teste).width > maxLargura && linhaAtual) {
+                    linhas.push(linhaAtual);
+                    linhaAtual = palavra;
+                } else {
+                    linhaAtual = teste;
+                }
+            });
+            if (linhaAtual) linhas.push(linhaAtual);
+            return linhas;
+        }
+
+        function formatarMoeda(valor) {
+            return `R$ ${Number(valor || 0).toFixed(2).replace('.', ',')}`;
+        }
+
+        async function desenharNota(pedido) {
+            const largura = 600;
+            const margem = 32;
+            const larguraUtil = largura - margem * 2;
+
+            // Canvas temporário só para medir a altura necessária antes de desenhar de verdade
+            const canvasMedida = document.createElement('canvas');
+            const ctxMedida = canvasMedida.getContext('2d');
+
+            let alturaEstimativa = 260; // cabeçalho + dados do cliente
+            ctxMedida.font = '14px Arial';
+            pedido.itens.forEach(item => {
+                const nomeItem = item.sabor_variacao ? `${item.nome} - ${item.sabor_variacao}` : item.nome;
+                const linhas = quebrarTexto(ctxMedida, nomeItem, larguraUtil - 140);
+                alturaEstimativa += Math.max(linhas.length, 1) * 20 + 10;
+            });
+            alturaEstimativa += 170; // totais + rodapé
+
+            const canvas = document.createElement('canvas');
+            canvas.width = largura;
+            canvas.height = alturaEstimativa;
+            const ctx = canvas.getContext('2d');
+
+            // Fundo
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let y = 34;
+
+            // Logo
+            try {
+                const logo = await carregarImagem('/logo.png');
+                const tamanhoLogo = 56;
+                ctx.drawImage(logo, margem, y, tamanhoLogo, tamanhoLogo);
+            } catch (e) {
+                console.warn('Não foi possível carregar a logo:', e);
+            }
+
+            ctx.fillStyle = '#111827';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('Master Distribuidora', margem + 68, y + 24);
+            ctx.font = '13px Arial';
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('Nota de Pedido', margem + 68, y + 44);
+
+            y += 76;
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 26;
+
+            // Dados do pedido
+            ctx.fillStyle = '#111827';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`Pedido`, margem, y);
+
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#6b7280';
+            const dataPedido = pedido.data_criacao ? new Date(pedido.data_criacao) : new Date();
+            const dataTexto = dataPedido.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+            ctx.textAlign = 'right';
+            ctx.fillText(dataTexto, largura - margem, y);
+            ctx.textAlign = 'left';
+
+            y += 22;
+            ctx.font = '13px Arial';
+            ctx.fillStyle = '#374151';
+            ctx.fillText(`Cliente: ${pedido.nome_cliente}`, margem, y);
+            y += 18;
+            ctx.fillText(`Telefone: ${pedido.telefone}`, margem, y);
+            y += 18;
+            const linhasEndereco = quebrarTexto(ctx, `Endereço: ${pedido.endereco}`, larguraUtil);
+            linhasEndereco.forEach(linha => {
+                ctx.fillText(linha, margem, y);
+                y += 18;
+            });
+
+            y += 10;
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 24;
+
+            // Cabeçalho da tabela de itens
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('QTD', margem, y);
+            ctx.fillText('PRODUTO', margem + 42, y);
+            ctx.textAlign = 'right';
+            ctx.fillText('UNIT.', largura - margem - 80, y);
+            ctx.fillText('SUBTOTAL', largura - margem, y);
+            ctx.textAlign = 'left';
+            y += 12;
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 20;
+
+            let subtotalProdutos = 0;
+            ctx.font = '13px Arial';
+            pedido.itens.forEach(item => {
+                const nomeItem = item.sabor_variacao ? `${item.nome} - ${item.sabor_variacao}` : item.nome;
+                const qtd = Number(item.quantidade || 0);
+                const precoUnit = Number(item.preco || 0);
+                const subtotalItem = qtd * precoUnit;
+                subtotalProdutos += subtotalItem;
+
+                const linhas = quebrarTexto(ctx, nomeItem, larguraUtil - 140);
+                ctx.fillStyle = '#111827';
+                ctx.fillText(String(qtd) + 'x', margem, y);
+                ctx.fillText(linhas[0] || '', margem + 42, y);
+                ctx.textAlign = 'right';
+                ctx.fillText(formatarMoeda(precoUnit), largura - margem - 80, y);
+                ctx.fillText(formatarMoeda(subtotalItem), largura - margem, y);
+                ctx.textAlign = 'left';
+
+                for (let i = 1; i < linhas.length; i++) {
+                    y += 18;
+                    ctx.fillText(linhas[i], margem + 42, y);
+                }
+                y += 26;
+            });
+
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.moveTo(margem, y);
+            ctx.lineTo(largura - margem, y);
+            ctx.stroke();
+            y += 24;
+
+            const taxaEntrega = Number(pedido.taxa_entrega || 0);
+            ctx.font = '13px Arial';
+            ctx.fillStyle = '#374151';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Subtotal produtos: ${formatarMoeda(subtotalProdutos)}`, largura - margem, y);
+            y += 20;
+            if (taxaEntrega > 0) {
+                ctx.fillText(`Taxa de entrega: ${formatarMoeda(taxaEntrega)}`, largura - margem, y);
+                y += 20;
+            }
+
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#111827';
+            ctx.fillText(`TOTAL: ${formatarMoeda(pedido.valor_total)}`, largura - margem, y);
+            ctx.textAlign = 'left';
+            y += 32;
+
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#6b7280';
+            const formaPagamentoTexto = pedido.forma_pagamento === 'dinheiro' ? 'Dinheiro' : 'PIX';
+            ctx.fillText(`Forma de pagamento: ${formaPagamentoTexto}`, margem, y);
+            y += 18;
             ctx.fillText(`Tipo de entrega: ${pedido.tipo_entrega === 'retirada' ? 'Retirada na loja' : 'Entrega'}`, margem, y);
             y += 30;
 
