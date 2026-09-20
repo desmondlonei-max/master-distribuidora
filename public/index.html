@@ -1439,7 +1439,7 @@
                                 </span>
 
                                 <span class="text-[11px] text-blue-800 font-semibold leading-relaxed">
-                                    Até 5un: R$ 4,00 un | 6un: R$ 20,00 | +10un: R$ 2,50 un | +40un: R$ 2,00 un
+                                    Até 5un: R$ 4,00 un | 6-10un: R$ 3,33 un | +10un: R$ 2,50 un | +40un: R$ 2,00 un
                                 </span>
 
                             </div>
@@ -1759,19 +1759,13 @@
 
                     return 2.50;
 
+                } else if (qtd >= 6) {
+
+                    return 3.33;
+
                 } else {
 
-                    let pacotesDeSeis =
-                        Math.floor(qtd / 6);
-
-                    let restoUnidades =
-                        qtd % 6;
-
-                    let valorTotalLote =
-                        (pacotesDeSeis * 20.00) +
-                        (restoUnidades * 4.00);
-
-                    return valorTotalLote / qtd;
+                    return 4.00;
                 }
             }
 
@@ -1815,17 +1809,15 @@
                     let qtd =
                         parseInt(item.quantidade) || 1;
 
-                    let pacotesDeSeis =
-                        Math.floor(qtd / 6);
-
-                    let restoUnidades =
-                        qtd % 6;
-
-                    precoBaseVarejo =
-                        (
-                            (pacotesDeSeis * 20.00) +
-                            (restoUnidades * 4.00)
-                        ) / qtd;
+                    if (qtd > 40) {
+                        precoBaseVarejo = 2.00;
+                    } else if (qtd > 10) {
+                        precoBaseVarejo = 2.50;
+                    } else if (qtd >= 6) {
+                        precoBaseVarejo = 3.33;
+                    } else {
+                        precoBaseVarejo = 4.00;
+                    }
                 }
 
 
