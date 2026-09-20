@@ -22,6 +22,12 @@ const dbConfig = {
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
+// Diagnóstico: confirma se as variáveis foram carregadas, sem expor os valores.
+// Se aparecer "false" aqui nos logs do serviço, a variável não está configurada
+// no ambiente onde o servidor está rodando (não é sobre o .env local).
+console.log('[config] ADMIN_PASSWORD definido:', Boolean(ADMIN_PASSWORD));
+console.log('[config] ADMIN_SECRET definido:', Boolean(ADMIN_SECRET));
+
 function criarTokenAdmin() {
     const payload = Buffer.from(JSON.stringify({ role: 'admin', exp: Date.now() + 12 * 60 * 60 * 1000 })).toString('base64url');
     const assinatura = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
