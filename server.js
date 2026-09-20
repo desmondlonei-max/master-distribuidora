@@ -19,7 +19,7 @@ const dbConfig = {
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
 };
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || '').trim();
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 // Diagnóstico: confirma se as variáveis foram carregadas, sem expor os valores.
