@@ -754,11 +754,13 @@ app.post('/pedidos', async (req, res) => {
 
             let precoBaseItem = Number(produtoDb.preco);
 
-            // Regra do gelo especial
+            // Regra do gelo especial: 1un R$4 / pacote de 6un R$20 / >10un R$2,50 cada / >40un R$2,00 cada
             if (produtoDb.eh_gelo_especial) {
                 const qtd = qtdGeloPorProduto[produtoDb.id];
 
-                if (qtd > 10) {
+                if (qtd > 40) {
+                    precoBaseItem = 2.00;
+                } else if (qtd > 10) {
                     precoBaseItem = 2.50;
                 } else {
                     const pacotesDeSeis = Math.floor(qtd / 6);
