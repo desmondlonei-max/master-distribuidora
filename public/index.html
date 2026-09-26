@@ -1439,7 +1439,7 @@
                                 </span>
 
                                 <span class="text-[11px] text-blue-800 font-semibold leading-relaxed">
-                                    Até 5un: R$ 4,00 un | 6-10un: R$ 3,33 un | +10un: R$ 2,50 un | +40un: R$ 2,00 un
+                                    Até 4un: R$ 4,00 un | 5-9un: R$ 3,33 un | 10-39un: R$ 2,50 un | 40un+: R$ 2,00 un
                                 </span>
 
                             </div>
@@ -1453,7 +1453,7 @@
                             <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 mt-3 flex flex-col gap-1">
 
                                 <span class="text-[10px] font-black text-blue-700 uppercase">
-                                    Atacado a partir de R$ 250
+                                    Atacado a partir de 4 unidades
                                 </span>
 
                                 <span class="text-sm font-black text-blue-800">
@@ -1730,13 +1730,10 @@
         }
 
 
-        // Quando o produto é "gelo especial" e tem variações (sabores), a faixa de
-        // preço (1un / 6un / >10un) considera a soma de TODAS as quantidades desse
-        // mesmo produto no carrinho, somando os sabores — não cada sabor isolado.
-        function calcularPrecoEfetivoItem(
-            item,
-            subtotalVarejoGeral
-        ) {
+        // Preço efetivo de um item do carrinho: aplica a regra do gelo (por faixa de
+        // quantidade agregada dos sabores) ou a regra de atacado (a partir de 4
+        // unidades DESSE item específico — não depende mais do total do carrinho).
+        function calcularPrecoEfetivoItem(item) {
 
             let qtd =
                 parseInt(item.quantidade) || 1;
@@ -1751,15 +1748,15 @@
                     .filter(i => i.id === item.id && (i.eh_gelo_especial == 1 || i.eh_gelo_especial === true))
                     .reduce((soma, i) => soma + (parseInt(i.quantidade) || 0), 0);
 
-                if (qtd > 40) {
+                if (qtd >= 40) {
 
                     return 2.00;
 
-                } else if (qtd > 10) {
+                } else if (qtd >= 10) {
 
                     return 2.50;
 
-                } else if (qtd >= 6) {
+                } else if (qtd >= 5) {
 
                     return 3.33;
 
@@ -1776,8 +1773,8 @@
 
 
             if (
-                subtotalVarejoGeral > 250 &&
-                temAtacado
+                temAtacado &&
+                qtd >= 4
             ) {
 
                 return Number(item.preco_atacado);
@@ -1792,56 +1789,13 @@
 
         function calcularTotalCarrinho() {
 
-            let subtotalParcial = 0;
-
-
-            carrinho.forEach(item => {
-
-                let precoBaseVarejo =
-                    Number(item.preco);
-
-
-                if (
-                    item.eh_gelo_especial == 1 ||
-                    item.eh_gelo_especial === true
-                ) {
-
-                    let qtd =
-                        parseInt(item.quantidade) || 1;
-
-                    if (qtd > 40) {
-                        precoBaseVarejo = 2.00;
-                    } else if (qtd > 10) {
-                        precoBaseVarejo = 2.50;
-                    } else if (qtd >= 6) {
-                        precoBaseVarejo = 3.33;
-                    } else {
-                        precoBaseVarejo = 4.00;
-                    }
-                }
-
-
-                subtotalParcial +=
-                    precoBaseVarejo *
-                    item.quantidade;
-
-            });
-
-
-            const passouDe250 =
-                subtotalParcial > 250;
-
-
             let valorTotalReal = 0;
 
 
             carrinho.forEach(item => {
 
                 let precoEfetivo =
-                    calcularPrecoEfetivoItem(
-                        item,
-                        subtotalParcial
-                    );
+                    calcularPrecoEfetivoItem(item);
 
                 valorTotalReal +=
                     precoEfetivo *
@@ -1865,8 +1819,6 @@
 
             return {
                 valorTotal: valorTotalReal,
-                passouDe250,
-                subtotalParcial,
                 entregaSelecionada,
                 taxaEntrega
             };
@@ -1955,8 +1907,6 @@
 
             const {
                 valorTotal,
-                passouDe250,
-                subtotalParcial,
                 entregaSelecionada
             } = calcularTotalCarrinho();
 
@@ -1975,15 +1925,18 @@
             carrinho.forEach(item => {
 
                 let precoEfetivo =
-                    calcularPrecoEfetivoItem(
-                        item,
-                        subtotalParcial
-                    );
+                    calcularPrecoEfetivoItem(item);
 
 
                 const temAtacado =
                     item.preco_atacado &&
                     Number(item.preco_atacado) > 0;
+
+                const qtdItem =
+                    parseInt(item.quantidade) || 1;
+
+                const atingiuAtacadoItem =
+                    qtdItem >= 4;
 
 
                 let avisoStatusHtml = '';
@@ -2003,7 +1956,7 @@
                     `;
 
                 } else if (
-                    passouDe250 &&
+                    atingiuAtacadoItem &&
                     temAtacado
                 ) {
 
@@ -2016,18 +1969,18 @@
                     `;
 
                 } else if (
-                    !passouDe250 &&
+                    !atingiuAtacadoItem &&
                     temAtacado
                 ) {
 
                     const faltaParaAtacado =
-                        250.01 - subtotalParcial;
+                        4 - qtdItem;
 
 
                     avisoStatusHtml = `
 
                         <span class="text-[10px] text-slate-500 block mt-1">
-                            Faltam R$ ${faltaParaAtacado.toFixed(2)} para o atacado
+                            Adicione mais ${faltaParaAtacado} ${faltaParaAtacado === 1 ? 'unidade' : 'unidades'} deste item para o preço de atacado
                         </span>
 
                     `;
@@ -2438,7 +2391,6 @@
 
                     const {
                         valorTotal,
-                        subtotalParcial,
                         entregaSelecionada
                     } =
                         calcularTotalCarrinho();
@@ -2489,10 +2441,7 @@
                             carrinho.map(i => {
 
                                 let precoEfetivo =
-                                    calcularPrecoEfetivoItem(
-                                        i,
-                                        subtotalParcial
-                                    );
+                                    calcularPrecoEfetivoItem(i);
 
 
                                 return {
