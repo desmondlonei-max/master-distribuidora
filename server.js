@@ -693,7 +693,6 @@ app.post('/pedidos', async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
         await connection.beginTransaction();
 
-        let subtotalVarejo = 0;
         const produtosDoPedido = [];
         const itensComDados = [];
 
@@ -760,22 +759,20 @@ app.post('/pedidos', async (req, res) => {
 
             let precoBaseItem = Number(produtoDb.preco);
 
-            // Regra do gelo especial: 1-5un R$4/un / 6-10un R$3,33/un / >10un R$2,50/un / >40un R$2,00/un
+            // Regra do gelo especial: 1-4un R$4/un / 5-9un R$3,33/un / 10-39un R$2,50/un / 40un+ R$2,00/un
             if (produtoDb.eh_gelo_especial) {
                 const qtd = qtdGeloPorProduto[produtoDb.id];
 
-                if (qtd > 40) {
+                if (qtd >= 40) {
                     precoBaseItem = 2.00;
-                } else if (qtd > 10) {
+                } else if (qtd >= 10) {
                     precoBaseItem = 2.50;
-                } else if (qtd >= 6) {
+                } else if (qtd >= 5) {
                     precoBaseItem = 3.33;
                 } else {
                     precoBaseItem = 4.00;
                 }
             }
-
-            subtotalVarejo += precoBaseItem * item.quantidade;
 
             produtosDoPedido.push({
                 id: produtoDb.id,
@@ -789,18 +786,22 @@ app.post('/pedidos', async (req, res) => {
             });
         }
 
-        const atingiuAtacado = subtotalVarejo > 250;
         let novoValorTotalCalculado = 0;
         const itensValidados = [];
 
+        // Atacado agora é por item: a partir de 4 unidades DE UM MESMO item
+        // (produto ou variação específica) no pedido, esse item passa a valer o
+        // preço de atacado dele. Não é mais sobre o valor total do carrinho, e
+        // não vale para gelo (que já tem sua própria tabela de faixas).
         for (let prod of produtosDoPedido) {
             let precoFinalItem = prod.preco_base;
 
-            if (
-                atingiuAtacado &&
-                prod.preco_atacado > 0 &&
-                !prod.eh_gelo
-            ) {
+            const atingiuAtacadoItem =
+                !prod.eh_gelo &&
+                Number(prod.quantidade) >= 4 &&
+                prod.preco_atacado > 0;
+
+            if (atingiuAtacadoItem) {
                 precoFinalItem = prod.preco_atacado;
             }
 
