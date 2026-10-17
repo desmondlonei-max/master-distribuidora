@@ -158,7 +158,7 @@ app.get('/produtos', async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
 
         const [rows] = await connection.execute(
-            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, possui_variacoes FROM produtos'
+            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, possui_variacoes, ordem FROM produtos ORDER BY ordem ASC, id ASC'
         );
 
         const variacoesPorProduto = await buscarVariacoesAgrupadas(connection);
@@ -184,7 +184,7 @@ app.get('/produtos-destaque', async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
 
         const [rows] = await connection.execute(
-            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, possui_variacoes FROM produtos WHERE destaque = 1 LIMIT 2'
+            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, possui_variacoes, ordem FROM produtos WHERE destaque = 1 ORDER BY ordem ASC, id ASC LIMIT 2'
         );
 
         const variacoesPorProduto = await buscarVariacoesAgrupadas(connection);
@@ -244,11 +244,15 @@ app.post('/produtos/agrupado', autenticarAdmin, async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
         await connection.beginTransaction();
 
+        const [[{ proxima }]] = await connection.execute(
+            'SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima FROM produtos'
+        );
+
         const [resultadoProduto] = await connection.execute(
             `INSERT INTO produtos
                 (nome, categoria_id, marca, descricao, volume, teor_alcoolico,
-                 preco, estoque, status, destaque, eh_gelo_especial, possui_variacoes)
-             VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'disponivel', ?, ?, 1)`,
+                 preco, estoque, status, destaque, eh_gelo_especial, possui_variacoes, ordem)
+             VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'disponivel', ?, ?, 1, ?)`,
             [
                 nome,
                 categoria_id || 1,
@@ -257,7 +261,8 @@ app.post('/produtos/agrupado', autenticarAdmin, async (req, res) => {
                 volume || null,
                 teor_alcoolico || null,
                 isDestaque,
-                isGeloEspecial
+                isGeloEspecial,
+                proxima
             ]
         );
 
@@ -444,6 +449,10 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
     try {
         connection = await mysql.createConnection(dbConfig);
 
+        const [[{ proxima }]] = await connection.execute(
+            'SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima FROM produtos'
+        );
+
         const query = `
             INSERT INTO produtos (
                 nome,
@@ -460,9 +469,10 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
                 status,
                 destaque,
                 sabores,
-                eh_gelo_especial
+                eh_gelo_especial,
+                ordem
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         await connection.execute(query, [
@@ -480,7 +490,8 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
             status || 'disponivel',
             isDestaque,
             sabores || null,
-            isGeloEspecial
+            isGeloEspecial,
+            proxima
         ]);
 
         res.status(201).json({
@@ -492,6 +503,37 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
         res.status(500).json({
             erro: 'Erro ao cadastrar produto.'
         });
+    } finally {
+        if (connection) await connection.end();
+    }
+});
+
+// Salva a ordem de exibição dos produtos (a ordem do array = ordem no site)
+app.put('/produtos-ordem', autenticarAdmin, async (req, res) => {
+    const ids = req.body && req.body.ids;
+
+    if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => !Number.isInteger(Number(id)))) {
+        return res.status(400).json({ erro: 'Lista de produtos inválida.' });
+    }
+
+    let connection;
+
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        await connection.beginTransaction();
+
+        for (let i = 0; i < ids.length; i++) {
+            await connection.execute('UPDATE produtos SET ordem = ? WHERE id = ?', [i + 1, Number(ids[i])]);
+        }
+
+        await connection.commit();
+        res.json({ sucesso: true });
+    } catch (erro) {
+        if (connection) {
+            try { await connection.rollback(); } catch {}
+        }
+        console.error('Erro ao salvar ordem dos produtos:', erro);
+        res.status(500).json({ erro: 'Erro ao salvar a ordem dos produtos.' });
     } finally {
         if (connection) await connection.end();
     }
@@ -1053,8 +1095,34 @@ app.get('/relatorio-semanal', autenticarAdmin, async (req, res) => {
     }
 });
 
+// Cria a coluna 'ordem' automaticamente (uma única vez) mantendo a ordem atual (por id)
+async function garantirColunaOrdem() {
+    let connection;
+
+    try {
+        connection = await mysql.createConnection(dbConfig);
+
+        const [[{ existe }]] = await connection.execute(
+            `SELECT COUNT(*) AS existe FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produtos' AND COLUMN_NAME = 'ordem'`
+        );
+
+        if (!existe) {
+            await connection.execute('ALTER TABLE produtos ADD COLUMN ordem INT NOT NULL DEFAULT 0');
+            await connection.execute('UPDATE produtos SET ordem = id');
+            console.log('[migração] Coluna produtos.ordem criada.');
+        }
+    } catch (erro) {
+        console.error('[migração] Não foi possível garantir a coluna produtos.ordem:', erro.message);
+    } finally {
+        if (connection) await connection.end();
+    }
+}
+
 const PORTA = Number(process.env.PORT || 3000);
 
-app.listen(PORTA, '0.0.0.0', () => {
-    console.log(`Servidor rodando na porta ${PORTA} 🚀`);
+garantirColunaOrdem().finally(() => {
+    app.listen(PORTA, '0.0.0.0', () => {
+        console.log(`Servidor rodando na porta ${PORTA} 🚀`);
+    });
 });
