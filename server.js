@@ -831,19 +831,29 @@ app.post('/pedidos', async (req, res) => {
         let novoValorTotalCalculado = 0;
         const itensValidados = [];
 
-        // Atacado agora é por item: a partir de 4 unidades DE UM MESMO item
-        // (produto ou variação específica) no pedido, esse item passa a valer o
-        // preço de atacado dele. Não é mais sobre o valor total do carrinho, e
-        // não vale para gelo (que já tem sua própria tabela de faixas).
+        // Atacado por valor do carrinho: quando o subtotal (a preço normal, sem
+        // taxa de entrega) chega a R$ 300,00, TODOS os itens que têm preço de
+        // atacado passam a valer esse preço. Não vale para gelo (que já tem sua
+        // própria tabela de faixas). Calculado aqui, nunca confiando no front-end.
+        const VALOR_MINIMO_ATACADO = 300;
+
+        const subtotalSemAtacado = produtosDoPedido.reduce(
+            (soma, prod) => soma + prod.preco_base * Number(prod.quantidade),
+            0
+        );
+
+        const carrinhoAtingiuAtacado =
+            subtotalSemAtacado >= VALOR_MINIMO_ATACADO;
+
         for (let prod of produtosDoPedido) {
             let precoFinalItem = prod.preco_base;
 
-            const atingiuAtacadoItem =
+            const aplicaAtacado =
                 !prod.eh_gelo &&
-                Number(prod.quantidade) >= 4 &&
+                carrinhoAtingiuAtacado &&
                 prod.preco_atacado > 0;
 
-            if (atingiuAtacadoItem) {
+            if (aplicaAtacado) {
                 precoFinalItem = prod.preco_atacado;
             }
 
