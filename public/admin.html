@@ -135,6 +135,7 @@
                     <table class="w-full text-left border-collapse min-w-[700px]">
                         <thead>
                             <tr class="border-b bg-gray-50 text-xs sm:text-sm text-gray-600">
+                                <th class="p-3">Ordem no site</th>
                                 <th class="p-3">Nome</th>
                                 <th class="p-3">Preço Padrão</th>
                                 <th class="p-3">Preço Atacado</th>
@@ -417,7 +418,8 @@
                 const tbody = document.getElementById('tabela-produtos');
                 tbody.innerHTML = '';
 
-                produtosCache.forEach(p => {
+                produtosCache.forEach((p, idx) => {
+                    const celulaOrdem = montarCelulaOrdem(idx, produtosCache.length);
                     const badgeGelo = (p.eh_gelo_especial === 1 || p.eh_gelo_especial === true)
                         ? '<span class="bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">🧊 Gelo Especial</span>'
                         : '<span class="text-gray-400 text-xs">-</span>';
@@ -434,6 +436,7 @@
 
                         tbody.innerHTML += `
                             <tr class="border-b hover:bg-gray-50/50 bg-blue-50/30">
+                                ${celulaOrdem}
                                 <td class="p-3 font-medium text-gray-900">
                                     ${p.nome}
                                     <span class="ml-2 bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">${p.variacoes.length} sabor(es)</span>
@@ -449,7 +452,7 @@
                                 </td>
                             </tr>
                             <tr id="linha-sabores-${p.id}" class="hidden border-b">
-                                <td colspan="7" class="p-3 bg-gray-50">
+                                <td colspan="8" class="p-3 bg-gray-50">
                                     <div id="conteudo-sabores-${p.id}"></div>
                                 </td>
                             </tr>
@@ -457,6 +460,7 @@
                     } else {
                         tbody.innerHTML += `
                             <tr class="border-b hover:bg-gray-50/50">
+                                ${celulaOrdem}
                                 <td class="p-3 font-medium text-gray-900">${p.nome}</td>
                                 <td class="p-3 font-semibold">R$ ${Number(p.preco || 0).toFixed(2).replace('.', ',')}</td>
                                 <td class="p-3 text-blue-600 font-semibold">R$ ${Number(p.preco_atacado || 0).toFixed(2).replace('.', ',')}</td>
@@ -474,6 +478,50 @@
             } catch (err) {
                 console.error('Erro ao carregar produtos:', err);
             }
+        }
+
+        // ==========================================
+        // ORDEM DE EXIBIÇÃO DOS PRODUTOS NO SITE
+        // ==========================================
+        function montarCelulaOrdem(idx, total) {
+            const estiloBtn = 'w-7 h-7 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed font-bold';
+            return `
+                <td class="p-3 whitespace-nowrap">
+                    <div class="flex items-center gap-1">
+                        <button type="button" title="Subir" onclick="reordenarProduto(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="${estiloBtn}">▲</button>
+                        <button type="button" title="Descer" onclick="reordenarProduto(${idx}, ${idx + 1})" ${idx === total - 1 ? 'disabled' : ''} class="${estiloBtn}">▼</button>
+                        <input type="number" min="1" max="${total}" value="${idx + 1}" title="Digite a posição e tecle Enter"
+                               onchange="reordenarProduto(${idx}, Number(this.value) - 1)"
+                               class="w-14 border border-gray-300 rounded-lg px-1 py-1 text-center text-xs">
+                    </div>
+                </td>`;
+        }
+
+        async function reordenarProduto(de, para) {
+            if (!Number.isInteger(para)) return carregarProdutos();
+            para = Math.max(0, Math.min(produtosCache.length - 1, para));
+            if (de === para) return carregarProdutos();
+
+            const lista = [...produtosCache];
+            const [movido] = lista.splice(de, 1);
+            lista.splice(para, 0, movido);
+
+            try {
+                const res = await apiFetch(`${API_URL}/produtos-ordem`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: lista.map(p => p.id) })
+                });
+
+                if (!res.ok) {
+                    const erro = await res.json().catch(() => ({}));
+                    throw new Error(erro.erro || 'Erro no servidor');
+                }
+            } catch (err) {
+                alert('Não foi possível salvar a ordem: ' + err.message);
+            }
+
+            await carregarProdutos();
         }
 
         // ==========================================
