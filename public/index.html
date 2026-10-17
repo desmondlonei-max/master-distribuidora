@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth"><!DOCTYPE html>
 <html lang="pt-BR" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
@@ -1453,7 +1454,7 @@
                             <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 mt-3 flex flex-col gap-1">
 
                                 <span class="text-[10px] font-black text-blue-700 uppercase">
-                                    Atacado a partir de 4 unidades
+                                    Atacado em compras a partir de R$ 300,00
                                 </span>
 
                                 <span class="text-sm font-black text-blue-800">
@@ -1730,60 +1731,75 @@
         }
 
 
-        // Preço efetivo de um item do carrinho: aplica a regra do gelo (por faixa de
-        // quantidade agregada dos sabores) ou a regra de atacado (a partir de 4
-        // unidades DESSE item específico — não depende mais do total do carrinho).
-        function calcularPrecoEfetivoItem(item) {
+        // Valor mínimo do carrinho (sem taxa de entrega) para TODOS os itens
+        // passarem a valer o preço de atacado.
+        const VALOR_MINIMO_ATACADO = 300;
 
-            let qtd =
-                parseInt(item.quantidade) || 1;
-
+        // Preço do item SEM considerar o atacado: gelo especial usa a tabela de
+        // faixas (quantidade agregada dos sabores); os demais usam o preço normal.
+        function calcularPrecoSemAtacado(item) {
 
             if (
                 item.eh_gelo_especial == 1 ||
                 item.eh_gelo_especial === true
             ) {
 
-                qtd = carrinho
+                const qtd = carrinho
                     .filter(i => i.id === item.id && (i.eh_gelo_especial == 1 || i.eh_gelo_especial === true))
                     .reduce((soma, i) => soma + (parseInt(i.quantidade) || 0), 0);
 
                 if (qtd >= 40) {
-
                     return 2.00;
-
                 } else if (qtd >= 10) {
-
                     return 2.50;
-
                 } else if (qtd >= 5) {
-
                     return 3.33;
-
                 } else {
-
                     return 4.00;
                 }
             }
 
+            return Number(item.preco);
+        }
+
+        // Subtotal do carrinho a preço normal (antes do atacado, sem taxa de
+        // entrega). É esse valor que decide se o atacado vale para o carrinho.
+        function calcularSubtotalSemAtacado() {
+
+            return carrinho.reduce((soma, item) =>
+                soma +
+                calcularPrecoSemAtacado(item) *
+                (parseInt(item.quantidade) || 0),
+                0
+            );
+        }
+
+        function carrinhoAtingiuAtacado() {
+            return calcularSubtotalSemAtacado() >= VALOR_MINIMO_ATACADO;
+        }
+
+        // Preço efetivo de um item do carrinho: gelo segue a própria tabela; os
+        // demais itens passam para o preço de atacado quando o carrinho chega a
+        // R$ 300,00 (vale para todos os produtos que têm preço de atacado).
+        function calcularPrecoEfetivoItem(item) {
+
+            const ehGelo =
+                item.eh_gelo_especial == 1 ||
+                item.eh_gelo_especial === true;
 
             const temAtacado =
                 item.preco_atacado &&
                 Number(item.preco_atacado) > 0;
 
-
             if (
+                !ehGelo &&
                 temAtacado &&
-                qtd >= 4
+                carrinhoAtingiuAtacado()
             ) {
-
                 return Number(item.preco_atacado);
-
             }
 
-
-            return Number(item.preco);
-
+            return calcularPrecoSemAtacado(item);
         }
 
 
@@ -1932,11 +1948,8 @@
                     item.preco_atacado &&
                     Number(item.preco_atacado) > 0;
 
-                const qtdItem =
-                    parseInt(item.quantidade) || 1;
-
-                const atingiuAtacadoItem =
-                    qtdItem >= 4;
+                const atingiuAtacadoCarrinho =
+                    carrinhoAtingiuAtacado();
 
 
                 let avisoStatusHtml = '';
@@ -1956,7 +1969,7 @@
                     `;
 
                 } else if (
-                    atingiuAtacadoItem &&
+                    atingiuAtacadoCarrinho &&
                     temAtacado
                 ) {
 
@@ -1969,18 +1982,17 @@
                     `;
 
                 } else if (
-                    !atingiuAtacadoItem &&
+                    !atingiuAtacadoCarrinho &&
                     temAtacado
                 ) {
 
                     const faltaParaAtacado =
-                        4 - qtdItem;
-
+                        VALOR_MINIMO_ATACADO - calcularSubtotalSemAtacado();
 
                     avisoStatusHtml = `
 
                         <span class="text-[10px] text-slate-500 block mt-1">
-                            Adicione mais ${faltaParaAtacado} ${faltaParaAtacado === 1 ? 'unidade' : 'unidades'} deste item para o preço de atacado
+                            Faltam R$ ${faltaParaAtacado.toFixed(2).replace('.', ',')} no carrinho para o preço de atacado
                         </span>
 
                     `;
