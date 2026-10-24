@@ -103,8 +103,14 @@
 
                     <!-- CAMPO: TIPO ESPECIAL DE PRODUTO (GELO) -->
                     <div class="md:col-span-3 flex items-center gap-2 bg-purple-50 border border-purple-200 p-3 rounded-xl">
-                        <input type="checkbox" id="eh_gelo_especial" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                        <input type="checkbox" id="eh_gelo_especial" onchange="if (this.checked) document.getElementById('eh_gelo_cubo').checked = false" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
                         <label for="eh_gelo_especial" class="text-xs sm:text-sm font-semibold text-purple-950 cursor-pointer">Gelo Especial: (1-4 un: R$ 4,00/cada | 5-9 un: R$ 3,33/cada | 10-39 un: R$ 2,50/cada | 40+ un: R$ 2,00/cada)</label>
+                    </div>
+
+                    <!-- CAMPO: GELO DE CUBO (NORMAL) -->
+                    <div class="md:col-span-3 flex items-center gap-2 bg-sky-50 border border-sky-200 p-3 rounded-xl">
+                        <input type="checkbox" id="eh_gelo_cubo" onchange="if (this.checked) document.getElementById('eh_gelo_especial').checked = false" class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
+                        <label for="eh_gelo_cubo" class="text-xs sm:text-sm font-semibold text-sky-950 cursor-pointer">Gelo de Cubo (normal): (1-2 un: R$ 7,00/cada | a partir de 3 un: R$ 5,00/cada)</label>
                     </div>
 
                     <!-- CAMPO: DESTAQUE NA VITRINE -->
@@ -422,7 +428,9 @@
                     const celulaOrdem = montarCelulaOrdem(idx, produtosCache.length);
                     const badgeGelo = (p.eh_gelo_especial === 1 || p.eh_gelo_especial === true)
                         ? '<span class="bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">🧊 Gelo Especial</span>'
-                        : '<span class="text-gray-400 text-xs">-</span>';
+                        : (p.eh_gelo_cubo === 1 || p.eh_gelo_cubo === true)
+                            ? '<span class="bg-sky-100 text-sky-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">🧊 Gelo de Cubo</span>'
+                            : '<span class="text-gray-400 text-xs">-</span>';
 
                     const temVariacoes = p.possui_variacoes && Array.isArray(p.variacoes) && p.variacoes.length > 0;
 
@@ -704,6 +712,7 @@
                     descricao: document.getElementById('descricao').value || null,
                     destaque: document.getElementById('destaque').checked ? 1 : 0,
                     eh_gelo_especial: document.getElementById('eh_gelo_especial').checked ? 1 : 0,
+                    eh_gelo_cubo: document.getElementById('eh_gelo_cubo').checked ? 1 : 0,
                     categoria_id: parseInt(document.getElementById('categoria_id').value) || null,
                     variacoes
                 };
@@ -747,6 +756,7 @@
                 status: document.getElementById('status').value,
                 destaque: document.getElementById('destaque').checked ? 1 : 0,
                 eh_gelo_especial: document.getElementById('eh_gelo_especial').checked ? 1 : 0,
+                eh_gelo_cubo: document.getElementById('eh_gelo_cubo').checked ? 1 : 0,
                 descricao: document.getElementById('descricao').value || null,
                 categoria_id: parseInt(document.getElementById('categoria_id').value) || null
             };
@@ -803,6 +813,7 @@
             document.getElementById('status').value = p.status;
             document.getElementById('destaque').checked = (p.destaque === 1 || p.destaque === true);
             document.getElementById('eh_gelo_especial').checked = (p.eh_gelo_especial === 1 || p.eh_gelo_especial === true);
+            document.getElementById('eh_gelo_cubo').checked = (p.eh_gelo_cubo === 1 || p.eh_gelo_cubo === true);
             document.getElementById('descricao').value = p.descricao || '';
 
             document.getElementById('titulo-form').textContent = 'Editar Produto';
