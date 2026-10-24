@@ -28,6 +28,16 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET;
 console.log('[config] ADMIN_PASSWORD definido:', Boolean(ADMIN_PASSWORD));
 console.log('[config] ADMIN_SECRET definido:', Boolean(ADMIN_SECRET));
 
+// Regra do GELO DE CUBO (normal): 1 ou 2 unidades = R$ 7,00 cada | 3 unidades ou mais = R$ 5,00 cada.
+// A quantidade considerada é o total do produto no carrinho (somando todos os sabores/variações dele).
+const GELO_CUBO_PRECO = 7.00;
+const GELO_CUBO_PRECO_PROMO = 5.00;
+const GELO_CUBO_QTD_PROMO = 3;
+
+function precoGeloCubo(quantidade) {
+    return Number(quantidade) >= GELO_CUBO_QTD_PROMO ? GELO_CUBO_PRECO_PROMO : GELO_CUBO_PRECO;
+}
+
 function criarTokenAdmin() {
     const payload = Buffer.from(JSON.stringify({ role: 'admin', exp: Date.now() + 12 * 60 * 60 * 1000 })).toString('base64url');
     const assinatura = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
@@ -158,7 +168,7 @@ app.get('/produtos', async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
 
         const [rows] = await connection.execute(
-            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, possui_variacoes, ordem FROM produtos ORDER BY ordem ASC, id ASC'
+            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, eh_gelo_cubo, possui_variacoes, ordem FROM produtos ORDER BY ordem ASC, id ASC'
         );
 
         const variacoesPorProduto = await buscarVariacoesAgrupadas(connection);
@@ -184,7 +194,7 @@ app.get('/produtos-destaque', async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
 
         const [rows] = await connection.execute(
-            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, possui_variacoes, ordem FROM produtos WHERE destaque = 1 ORDER BY ordem ASC, id ASC LIMIT 2'
+            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, eh_gelo_cubo, possui_variacoes, ordem FROM produtos WHERE destaque = 1 ORDER BY ordem ASC, id ASC LIMIT 2'
         );
 
         const variacoesPorProduto = await buscarVariacoesAgrupadas(connection);
@@ -218,6 +228,7 @@ app.post('/produtos/agrupado', autenticarAdmin, async (req, res) => {
         teor_alcoolico,
         destaque,
         eh_gelo_especial,
+        eh_gelo_cubo,
         variacoes
     } = req.body;
 
@@ -237,6 +248,7 @@ app.post('/produtos/agrupado', autenticarAdmin, async (req, res) => {
 
     const isDestaque = destaque ? 1 : 0;
     const isGeloEspecial = eh_gelo_especial ? 1 : 0;
+    const isGeloCubo = (eh_gelo_cubo && !isGeloEspecial) ? 1 : 0; // um produto é gelo especial OU gelo de cubo
 
     let connection;
 
@@ -251,8 +263,8 @@ app.post('/produtos/agrupado', autenticarAdmin, async (req, res) => {
         const [resultadoProduto] = await connection.execute(
             `INSERT INTO produtos
                 (nome, categoria_id, marca, descricao, volume, teor_alcoolico,
-                 preco, estoque, status, destaque, eh_gelo_especial, possui_variacoes, ordem)
-             VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'disponivel', ?, ?, 1, ?)`,
+                 preco, estoque, status, destaque, eh_gelo_especial, eh_gelo_cubo, possui_variacoes, ordem)
+             VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'disponivel', ?, ?, ?, 1, ?)`,
             [
                 nome,
                 categoria_id || 1,
@@ -262,6 +274,7 @@ app.post('/produtos/agrupado', autenticarAdmin, async (req, res) => {
                 teor_alcoolico || null,
                 isDestaque,
                 isGeloEspecial,
+                isGeloCubo,
                 proxima
             ]
         );
@@ -438,11 +451,13 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
         status,
         destaque,
         sabores,
-        eh_gelo_especial
+        eh_gelo_especial,
+        eh_gelo_cubo
     } = req.body;
 
     const isDestaque = destaque ? 1 : 0;
     const isGeloEspecial = eh_gelo_especial ? 1 : 0;
+    const isGeloCubo = (eh_gelo_cubo && !isGeloEspecial) ? 1 : 0; // um produto é gelo especial OU gelo de cubo
 
     let connection;
 
@@ -470,9 +485,10 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
                 destaque,
                 sabores,
                 eh_gelo_especial,
+                eh_gelo_cubo,
                 ordem
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         await connection.execute(query, [
@@ -491,6 +507,7 @@ app.post('/produtos', autenticarAdmin, async (req, res) => {
             isDestaque,
             sabores || null,
             isGeloEspecial,
+            isGeloCubo,
             proxima
         ]);
 
@@ -557,11 +574,13 @@ app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
         status,
         destaque,
         sabores,
-        eh_gelo_especial
+        eh_gelo_especial,
+        eh_gelo_cubo
     } = req.body;
 
     const isDestaque = destaque ? 1 : 0;
     const isGeloEspecial = eh_gelo_especial ? 1 : 0;
+    const isGeloCubo = (eh_gelo_cubo && !isGeloEspecial) ? 1 : 0; // um produto é gelo especial OU gelo de cubo
 
     let connection;
 
@@ -585,7 +604,8 @@ app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
                 status = ?,
                 destaque = ?,
                 sabores = ?,
-                eh_gelo_especial = ?
+                eh_gelo_especial = ?,
+                eh_gelo_cubo = ?
             WHERE id = ?
         `;
 
@@ -605,6 +625,7 @@ app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
             isDestaque,
             sabores || null,
             isGeloEspecial,
+            isGeloCubo,
             id
         ]);
 
@@ -748,7 +769,7 @@ app.post('/pedidos', async (req, res) => {
             if (item.variacao_id) {
                 const [variacaoRows] = await connection.execute(
                     `SELECT v.id AS variacao_id, v.estoque, v.preco, v.preco_atacado,
-                            p.id, p.nome, p.eh_gelo_especial
+                            p.id, p.nome, p.eh_gelo_especial, p.eh_gelo_cubo
                      FROM produto_variacoes v
                      INNER JOIN produtos p ON v.produto_id = p.id
                      WHERE v.id = ? AND v.produto_id = ?`,
@@ -764,7 +785,7 @@ app.post('/pedidos', async (req, res) => {
                 produtoDb = variacaoDb;
             } else {
                 const [rows] = await connection.execute(
-                    'SELECT id, estoque, nome, preco, preco_atacado, eh_gelo_especial FROM produtos WHERE id = ?',
+                    'SELECT id, estoque, nome, preco, preco_atacado, eh_gelo_especial, eh_gelo_cubo FROM produtos WHERE id = ?',
                     [item.id]
                 );
 
@@ -790,7 +811,7 @@ app.post('/pedidos', async (req, res) => {
         const qtdGeloPorProduto = {};
 
         for (const { item, produtoDb } of itensComDados) {
-            if (produtoDb.eh_gelo_especial) {
+            if (produtoDb.eh_gelo_especial || produtoDb.eh_gelo_cubo) {
                 qtdGeloPorProduto[produtoDb.id] =
                     (qtdGeloPorProduto[produtoDb.id] || 0) + Number(item.quantidade);
             }
@@ -816,6 +837,11 @@ app.post('/pedidos', async (req, res) => {
                 }
             }
 
+            // Regra do gelo de cubo (normal): 1-2un R$7,00/un | 3un+ R$5,00/un
+            if (!produtoDb.eh_gelo_especial && produtoDb.eh_gelo_cubo) {
+                precoBaseItem = precoGeloCubo(qtdGeloPorProduto[produtoDb.id]);
+            }
+
             produtosDoPedido.push({
                 id: produtoDb.id,
                 variacao_id: variacaoId,
@@ -824,7 +850,7 @@ app.post('/pedidos', async (req, res) => {
                 preco_atacado: produtoDb.preco_atacado
                     ? Number(produtoDb.preco_atacado)
                     : 0,
-                eh_gelo: produtoDb.eh_gelo_especial
+                eh_gelo: produtoDb.eh_gelo_especial || produtoDb.eh_gelo_cubo // gelo nunca entra no atacado por valor
             });
         }
 
@@ -1129,9 +1155,35 @@ async function garantirColunaOrdem() {
     }
 }
 
+// Cria a coluna 'eh_gelo_cubo' automaticamente (uma única vez). Sem ela as listagens de produtos não funcionam,
+// então, se não for possível criá-la, o servidor avisa claramente e não inicia.
+async function garantirColunaGeloCubo() {
+    let connection;
+
+    try {
+        connection = await mysql.createConnection(dbConfig);
+
+        const [[{ existe }]] = await connection.execute(
+            `SELECT COUNT(*) AS existe FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produtos' AND COLUMN_NAME = 'eh_gelo_cubo'`
+        );
+
+        if (!existe) {
+            await connection.execute('ALTER TABLE produtos ADD COLUMN eh_gelo_cubo TINYINT(1) NOT NULL DEFAULT 0');
+            console.log('[migração] Coluna produtos.eh_gelo_cubo criada.');
+        }
+    } catch (erro) {
+        console.error('[migração] Não foi possível criar a coluna produtos.eh_gelo_cubo:', erro.message);
+        console.error('Crie manualmente no MySQL: ALTER TABLE produtos ADD COLUMN eh_gelo_cubo TINYINT(1) NOT NULL DEFAULT 0;');
+        process.exit(1);
+    } finally {
+        if (connection) await connection.end();
+    }
+}
+
 const PORTA = Number(process.env.PORT || 3000);
 
-garantirColunaOrdem().finally(() => {
+garantirColunaOrdem().then(garantirColunaGeloCubo).finally(() => {
     app.listen(PORTA, '0.0.0.0', () => {
         console.log(`Servidor rodando na porta ${PORTA} 🚀`);
     });
