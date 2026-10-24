@@ -1426,7 +1426,25 @@
                     let blocoAtacado = '';
 
 
-                    if (
+                    if (ehGeloCubo(produto) && !ehGeloEspecial(produto)) {
+
+                        blocoAtacado = `
+
+                            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 mt-3">
+
+                                <span class="text-[10px] font-black text-blue-700 uppercase block mb-1">
+                                    Gelo de cubo
+                                </span>
+
+                                <span class="text-[11px] text-blue-800 font-semibold leading-relaxed">
+                                    1-2un: R$ 7,00 un | A partir de 3un: R$ 5,00 un
+                                </span>
+
+                            </div>
+
+                        `;
+
+                    } else if (
                         produto.eh_gelo_especial == 1 ||
                         produto.eh_gelo_especial === true
                     ) {
@@ -1737,7 +1755,26 @@
 
         // Preço do item SEM considerar o atacado: gelo especial usa a tabela de
         // faixas (quantidade agregada dos sabores); os demais usam o preço normal.
+        function ehGeloEspecial(item) {
+            return item.eh_gelo_especial == 1 || item.eh_gelo_especial === true;
+        }
+
+        function ehGeloCubo(item) {
+            return item.eh_gelo_cubo == 1 || item.eh_gelo_cubo === true;
+        }
+
         function calcularPrecoSemAtacado(item) {
+
+            // Gelo de cubo (normal): 1-2un R$ 7,00 cada | 3un ou mais R$ 5,00 cada.
+            // Conta o total do produto no carrinho (somando todos os sabores/variações dele).
+            if (ehGeloCubo(item) && !ehGeloEspecial(item)) {
+
+                const qtdCubo = carrinho
+                    .filter(i => i.id === item.id && ehGeloCubo(i) && !ehGeloEspecial(i))
+                    .reduce((soma, i) => soma + (parseInt(i.quantidade) || 0), 0);
+
+                return qtdCubo >= 3 ? 5.00 : 7.00;
+            }
 
             if (
                 item.eh_gelo_especial == 1 ||
@@ -1783,9 +1820,7 @@
         // R$ 300,00 (vale para todos os produtos que têm preço de atacado).
         function calcularPrecoEfetivoItem(item) {
 
-            const ehGelo =
-                item.eh_gelo_especial == 1 ||
-                item.eh_gelo_especial === true;
+            const ehGelo = ehGeloEspecial(item) || ehGeloCubo(item);
 
             const temAtacado =
                 item.preco_atacado &&
@@ -1956,8 +1991,8 @@
 
 
                 if (
-                    item.eh_gelo_especial == 1 ||
-                    item.eh_gelo_especial === true
+                    ehGeloEspecial(item) ||
+                    ehGeloCubo(item)
                 ) {
 
                     avisoStatusHtml = `
