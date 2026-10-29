@@ -8,6 +8,7 @@
     <link rel="icon" type="image/jpeg" href="/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-x-hidden">
 
@@ -42,21 +43,129 @@
 
         <main class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
 
-            <!-- CARD DE RELATÓRIO SEMANAL -->
-            <div class="bg-blue-600 text-white p-4 sm:p-6 rounded-2xl shadow-lg grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                <div class="bg-blue-700/50 p-4 rounded-xl border border-blue-500/30">
-                    <span class="text-xs sm:text-sm uppercase tracking-wider text-blue-200 font-medium">Pedidos na Semana</span>
-                    <h3 id="rel-pedidos" class="text-2xl sm:text-3xl font-bold mt-1">0</h3>
+            <!-- PAINEL DE ESTATÍSTICAS -->
+            <section id="painel-estatisticas" class="space-y-4 sm:space-y-6">
+
+                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                    <div class="flex flex-col xl:flex-row xl:items-end gap-4">
+                        <div class="flex-1">
+                            <h2 class="text-base sm:text-lg font-bold text-gray-800"><i class="fa-solid fa-chart-line text-blue-600 mr-2"></i>Painel de Estatísticas</h2>
+                            <p id="est-periodo-texto" class="text-xs text-gray-500 mt-1">Carregando...</p>
+                        </div>
+                        <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:items-end">
+                            <div class="col-span-2 sm:col-span-1">
+                                <label class="block text-[11px] font-bold text-gray-500 mb-1">Período</label>
+                                <select id="est-preset" onchange="estMudarPreset()" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white">
+                                    <option value="hoje">Hoje</option>
+                                    <option value="7d">Últimos 7 dias</option>
+                                    <option value="30d">Últimos 30 dias</option>
+                                    <option value="semana">Esta semana</option>
+                                    <option value="mes" selected>Este mês</option>
+                                    <option value="mes_passado">Mês passado</option>
+                                    <option value="custom">Personalizado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-500 mb-1">De</label>
+                                <input type="date" id="est-de" onchange="estDatasAlteradas()" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-500 mb-1">Até</label>
+                                <input type="date" id="est-ate" onchange="estDatasAlteradas()" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
+                            </div>
+                            <button type="button" onclick="carregarEstatisticas()" class="col-span-2 sm:col-span-1 bg-blue-600 text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition text-sm shadow-sm">
+                                <i class="fa-solid fa-rotate mr-1"></i> Atualizar
+                            </button>
+                        </div>
+                    </div>
+                    <p id="est-erro" class="hidden mt-3 text-sm font-semibold text-red-600"></p>
                 </div>
-                <div class="bg-blue-700/50 p-4 rounded-xl border border-blue-500/30">
-                    <span class="text-xs sm:text-sm uppercase tracking-wider text-blue-200 font-medium">Faturamento Semanal</span>
-                    <h3 id="rel-faturamento" class="text-2xl sm:text-3xl font-bold mt-1">R$ 0,00</h3>
+
+                <div id="est-kpis" class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4"></div>
+
+                <div id="est-vazio" class="hidden bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-2xl p-4">
+                    Nenhuma venda registrada neste período. Escolha outro período para ver os gráficos e tabelas.
                 </div>
-                <div class="bg-blue-700/50 p-4 rounded-xl border border-blue-500/30">
-                    <span class="text-xs sm:text-sm uppercase tracking-wider text-blue-200 font-medium">Lucro Semanal</span>
-                    <h3 id="rel-lucro" class="text-2xl sm:text-3xl font-bold mt-1 text-emerald-300">R$ 0,00</h3>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                    <div class="lg:col-span-2 bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Faturamento e lucro por dia</h3>
+                        <div class="relative h-64 sm:h-72"><canvas id="est-g-dia"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Formas de pagamento</h3>
+                        <div class="relative h-64 sm:h-72"><canvas id="est-g-forma"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Pedidos por situação</h3>
+                        <div class="relative h-64"><canvas id="est-g-status"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Pedidos por dia da semana</h3>
+                        <div class="relative h-64"><canvas id="est-g-semana"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Pedidos por horário</h3>
+                        <div class="relative h-64"><canvas id="est-g-hora"></canvas></div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Faturamento por categoria</h3>
+                        <div class="relative h-64"><canvas id="est-g-categoria"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Entrega x retirada</h3>
+                        <div class="relative h-64"><canvas id="est-g-entrega"></canvas></div>
+                    </div>
                 </div>
-            </div>
+
+                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base">Produtos mais vendidos</h3>
+                        <button type="button" onclick="estExportar('produtos')" class="text-xs font-bold text-blue-600 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i>Exportar CSV</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[640px]">
+                            <thead><tr class="border-b bg-gray-50 text-xs sm:text-sm text-gray-600">
+                                <th class="p-3 w-10">#</th><th class="p-3">Produto</th><th class="p-3 text-right">Qtd.</th>
+                                <th class="p-3 text-right">Faturamento</th><th class="p-3 text-right">Lucro</th><th class="p-3 w-40">% do faturamento</th>
+                            </tr></thead>
+                            <tbody id="est-tb-produtos" class="text-xs sm:text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <div class="flex items-center justify-between gap-2 mb-3">
+                            <h3 class="font-bold text-gray-800 text-sm sm:text-base">Resumo por dia</h3>
+                            <button type="button" onclick="estExportar('dias')" class="text-xs font-bold text-blue-600 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i>Exportar CSV</button>
+                        </div>
+                        <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                            <table class="w-full text-left border-collapse min-w-[460px]">
+                                <thead class="sticky top-0"><tr class="border-b bg-gray-50 text-xs sm:text-sm text-gray-600">
+                                    <th class="p-3">Data</th><th class="p-3 text-right">Pedidos</th><th class="p-3 text-right">Faturamento</th><th class="p-3 text-right">Lucro</th>
+                                </tr></thead>
+                                <tbody id="est-tb-dias" class="text-xs sm:text-sm"></tbody>
+                                <tfoot id="est-tf-dias" class="text-xs sm:text-sm font-bold bg-gray-50"></tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-sm sm:text-base mb-3">Situação do estoque</h3>
+                        <div id="est-estoque-cards" class="grid grid-cols-2 gap-3 mb-4"></div>
+                        <div class="overflow-x-auto max-h-72 overflow-y-auto">
+                            <table class="w-full text-left border-collapse min-w-[360px]">
+                                <thead class="sticky top-0"><tr class="border-b bg-gray-50 text-xs sm:text-sm text-gray-600">
+                                    <th class="p-3">Produto</th><th class="p-3 text-right">Estoque</th><th class="p-3">Situação</th>
+                                </tr></thead>
+                                <tbody id="est-tb-estoque" class="text-xs sm:text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
 
             <!-- GERENCIAR PRODUTOS -->
             <section class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
@@ -137,7 +246,12 @@
                     </div>
                 </form>
 
-                <div class="mt-8 overflow-x-auto">
+                <div class="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                    <h3 class="font-bold text-gray-800 text-sm sm:text-base">Produtos cadastrados</h3>
+                    <input type="search" id="prod-busca" oninput="estBuscarProdutos()" placeholder="Pesquisar por nome ou marca"
+                           class="w-full sm:w-72 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse min-w-[700px]">
                         <thead>
                             <tr class="border-b bg-gray-50 text-xs sm:text-sm text-gray-600">
@@ -159,6 +273,19 @@
             <!-- HISTÓRICO DE PEDIDOS -->
             <section class="bg-white p-4 sm:p-6 rounded-2xl shadow border border-gray-200">
                 <h2 class="text-base sm:text-lg font-bold mb-4 text-gray-800">Histórico de Pedidos</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
+                    <input type="search" id="ped-busca" oninput="estBuscarPedidos()" placeholder="Buscar por cliente, telefone ou nº do pedido"
+                           class="sm:col-span-3 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="ped-status" onchange="renderizarPedidos()" class="border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white">
+                        <option value="">Todos os status</option>
+                        <option value="pendente">Pendente</option>
+                        <option value="pago">Pago</option>
+                        <option value="enviado">Enviado</option>
+                        <option value="entregue">Entregue</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <p id="ped-resumo" class="text-xs text-gray-500 mb-3"></p>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse min-w-[750px]">
                         <thead>
@@ -397,25 +524,242 @@
             carregarPedidos();
         }
 
-        async function carregarRelatorioSemanal() {
-            try {
-                const res = await apiFetch(`${API_URL}/relatorio-semanal`);
-                const dados = await res.json();
-                
-                const totalPedidos = Number(dados.total_pedidos) || 0;
-                const faturamento = Number(dados.faturamento) || 0;
-                const lucro = Number(dados.lucro) || 0;
+        // ==========================================
+        // PAINEL DE ESTATÍSTICAS
+        // ==========================================
+        const estBRL = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const estNum = (v, d = 1) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: d });
+        const estEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const estDataBR = iso => (iso ? iso.split('-').reverse().join('/') : '');
+        const estIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const estSomaDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return estIso(d); };
+        const EST_FORMAS = { dinheiro: 'Dinheiro', pix: 'PIX', nao_informado: 'Não informado' };
+        const EST_ENTREGAS = { entrega: 'Entrega', retirada: 'Retirada na loja' };
+        const EST_STATUS = { pendente: 'Pendente', pago: 'Pago', enviado: 'Enviado', entregue: 'Entregue', cancelado: 'Cancelado' };
+        const EST_COR_STATUS = { pendente: '#f59e0b', pago: '#2563eb', enviado: '#7c3aed', entregue: '#059669', cancelado: '#dc2626' };
+        const EST_CORES = ['#2563eb', '#059669', '#f59e0b', '#7c3aed', '#dc2626', '#0891b2', '#db2777', '#64748b'];
+        const EST_DIAS_SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+        let estGraficos = {};
+        let estDados = null;
+        let estTimer = null;
 
-                document.getElementById('rel-pedidos').textContent = totalPedidos;
-                document.getElementById('rel-faturamento').textContent = `R$ ${faturamento.toFixed(2).replace('.', ',')}`;
-                document.getElementById('rel-lucro').textContent = `R$ ${lucro.toFixed(2).replace('.', ',')}`;
+        function estPeriodoPreset(preset) {
+            const hoje = estIso(new Date());
+            const d = new Date();
+            if (preset === 'hoje') return { de: hoje, ate: hoje };
+            if (preset === '7d') return { de: estSomaDias(hoje, -6), ate: hoje };
+            if (preset === '30d') return { de: estSomaDias(hoje, -29), ate: hoje };
+            if (preset === 'semana') return { de: estSomaDias(hoje, -((d.getDay() + 6) % 7)), ate: hoje };
+            if (preset === 'mes_passado') return { de: estIso(new Date(d.getFullYear(), d.getMonth() - 1, 1)), ate: estIso(new Date(d.getFullYear(), d.getMonth(), 0)) };
+            return { de: estIso(new Date(d.getFullYear(), d.getMonth(), 1)), ate: hoje };
+        }
+
+        function estMudarPreset() {
+            const p = document.getElementById('est-preset').value;
+            if (p === 'custom') return;
+            const { de, ate } = estPeriodoPreset(p);
+            document.getElementById('est-de').value = de;
+            document.getElementById('est-ate').value = ate;
+            carregarEstatisticas();
+        }
+
+        function estDatasAlteradas() {
+            document.getElementById('est-preset').value = 'custom';
+            clearTimeout(estTimer);
+            estTimer = setTimeout(carregarEstatisticas, 400);
+        }
+
+        // Mantido porque outras partes do painel chamam este nome após alterar pedidos
+        function carregarRelatorioSemanal() { return carregarEstatisticas(); }
+
+        async function carregarEstatisticas() {
+            const inDe = document.getElementById('est-de'), inAte = document.getElementById('est-ate');
+            if (!inDe.value || !inAte.value) {
+                const p = estPeriodoPreset(document.getElementById('est-preset').value);
+                inDe.value = p.de; inAte.value = p.ate;
+            }
+            const erro = document.getElementById('est-erro');
+            erro.classList.add('hidden');
+
+            try {
+                const res = await apiFetch(`${API_URL}/estatisticas?de=${inDe.value}&ate=${inAte.value}`);
+                const dados = await res.json();
+                if (!res.ok) throw new Error(dados.erro || 'Não foi possível carregar as estatísticas.');
+                estDados = dados;
+                estRenderizar(dados);
             } catch (err) {
-                console.error('Erro ao carregar relatório:', err);
-                document.getElementById('rel-pedidos').textContent = '0';
-                document.getElementById('rel-faturamento').textContent = 'R$ 0,00';
-                document.getElementById('rel-lucro').textContent = 'R$ 0,00';
+                console.error('Erro ao carregar estatísticas:', err);
+                erro.textContent = err.message || 'Erro ao carregar estatísticas.';
+                erro.classList.remove('hidden');
             }
         }
+
+        function estVariacao(atual, anterior) {
+            if (!(anterior > 0)) return '<span class="text-[11px] text-gray-400">sem base de comparação</span>';
+            const v = ((atual - anterior) / anterior) * 100;
+            const sobe = v >= 0;
+            return `<span class="text-[11px] font-semibold ${sobe ? 'text-emerald-600' : 'text-red-600'}">${sobe ? '▲' : '▼'} ${estNum(Math.abs(v))}% vs. período anterior</span>`;
+        }
+
+        function estCartao(icone, rotulo, valor, sub, cor = 'text-gray-900') {
+            return `
+                <div class="bg-white p-3 sm:p-4 rounded-2xl shadow border border-gray-200 flex flex-col gap-1 min-w-0">
+                    <div class="flex items-center gap-2 text-gray-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide">
+                        <i class="fa-solid ${icone} text-blue-600"></i><span class="truncate">${rotulo}</span>
+                    </div>
+                    <div class="text-lg sm:text-2xl font-extrabold ${cor} break-words">${valor}</div>
+                    <div class="min-h-[16px]">${sub || ''}</div>
+                </div>`;
+        }
+
+        function estListarDias(de, ate) {
+            const dias = [];
+            for (let d = de; d <= ate && dias.length < 400; d = estSomaDias(d, 1)) dias.push(d);
+            return dias;
+        }
+
+        function estGrafico(id, config) {
+            if (estGraficos[id]) estGraficos[id].destroy();
+            if (typeof Chart === 'undefined') return;
+            config.options = { responsive: true, maintainAspectRatio: false, ...(config.options || {}) };
+            estGraficos[id] = new Chart(document.getElementById(id), config);
+        }
+
+        function estRenderizar(d) {
+            const k = d.kpis, a = d.anterior;
+            document.getElementById('est-periodo-texto').textContent =
+                `Período: ${estDataBR(d.periodo.de)} a ${estDataBR(d.periodo.ate)} (${d.periodo.dias} dia${d.periodo.dias > 1 ? 's' : ''}) — comparado com ${estDataBR(d.periodo.anterior_de)} a ${estDataBR(d.periodo.anterior_ate)}. Pedidos cancelados não entram nos valores.`;
+
+            document.getElementById('est-kpis').innerHTML = [
+                estCartao('fa-sack-dollar', 'Faturamento', estBRL(k.faturamento), estVariacao(k.faturamento, a.faturamento)),
+                estCartao('fa-chart-line', 'Lucro estimado', estBRL(k.lucro), estVariacao(k.lucro, a.lucro), k.lucro >= 0 ? 'text-emerald-600' : 'text-red-600'),
+                estCartao('fa-receipt', 'Pedidos', estNum(k.pedidos, 0), estVariacao(k.pedidos, a.pedidos)),
+                estCartao('fa-tags', 'Ticket médio', estBRL(k.ticket_medio), estVariacao(k.ticket_medio, a.ticket_medio)),
+                estCartao('fa-box', 'Itens vendidos', estNum(k.itens_vendidos, 0), ''),
+                estCartao('fa-percent', 'Margem de lucro', `${estNum(k.margem)}%`, '<span class="text-[11px] text-gray-400">lucro ÷ faturamento</span>'),
+                estCartao('fa-circle-check', 'Já recebido', estBRL(k.recebido), '<span class="text-[11px] text-gray-400">pago, enviado ou entregue</span>', 'text-emerald-600'),
+                estCartao('fa-hourglass-half', 'A receber', estBRL(k.a_receber), '<span class="text-[11px] text-gray-400">pedidos pendentes</span>', k.a_receber > 0 ? 'text-amber-600' : 'text-gray-900'),
+                estCartao('fa-motorcycle', 'Taxas de entrega', estBRL(k.taxas_entrega), '<span class="text-[11px] text-gray-400">não incluídas no faturamento</span>'),
+                estCartao('fa-ban', 'Cancelados', estNum(k.cancelados, 0), '<span class="text-[11px] text-gray-400">pedidos no período</span>', k.cancelados > 0 ? 'text-red-600' : 'text-gray-900')
+            ].join('');
+
+            document.getElementById('est-vazio').classList.toggle('hidden', k.pedidos > 0);
+
+            // Gráfico: faturamento e lucro por dia (dias sem venda aparecem zerados)
+            const mapa = Object.fromEntries(d.por_dia.map(x => [x.dia, x]));
+            const dias = estListarDias(d.periodo.de, d.periodo.ate);
+            estGrafico('est-g-dia', {
+                data: {
+                    labels: dias.map(x => estDataBR(x).slice(0, 5)),
+                    datasets: [
+                        { type: 'bar', label: 'Faturamento', data: dias.map(x => (mapa[x] ? mapa[x].faturamento : 0)), backgroundColor: '#2563eb', borderRadius: 4 },
+                        { type: 'line', label: 'Lucro', data: dias.map(x => (mapa[x] ? mapa[x].lucro : 0)), borderColor: '#059669', backgroundColor: '#059669', tension: 0.25, pointRadius: dias.length > 31 ? 0 : 3 }
+                    ]
+                },
+                options: { interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + estNum(v, 0) } } }, plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${estBRL(c.parsed.y)}` } } } }
+            });
+
+            const rosca = (id, itens, nomes, cores) => estGrafico(id, {
+                type: 'doughnut',
+                data: { labels: itens.map(i => nomes[i.chave] || i.chave), datasets: [{ data: itens.map(i => i.pedidos), backgroundColor: itens.map((_, n) => cores[n % cores.length]) }] },
+                options: { plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => { const i = itens[c.dataIndex]; return `${c.label}: ${i.pedidos} pedido(s)${i.faturamento !== undefined ? ' — ' + estBRL(i.faturamento) : ''}`; } } } } }
+            });
+            rosca('est-g-forma', d.por_forma_pagamento, EST_FORMAS, EST_CORES);
+            rosca('est-g-entrega', d.por_tipo_entrega, EST_ENTREGAS, EST_CORES);
+
+            const status = Object.entries(d.por_status).map(([chave, pedidos]) => ({ chave, pedidos }));
+            rosca('est-g-status', status, EST_STATUS, status.map(s => EST_COR_STATUS[s.chave] || '#64748b'));
+
+            estGrafico('est-g-semana', {
+                type: 'bar',
+                data: { labels: EST_DIAS_SEMANA, datasets: [{ label: 'Pedidos', data: d.por_dia_semana.map(x => x.pedidos), backgroundColor: '#7c3aed', borderRadius: 4 }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+            });
+            estGrafico('est-g-hora', {
+                type: 'bar',
+                data: { labels: d.por_hora.map(x => `${String(x.hora).padStart(2, '0')}h`), datasets: [{ label: 'Pedidos', data: d.por_hora.map(x => x.pedidos), backgroundColor: '#0891b2', borderRadius: 3 }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+            });
+            estGrafico('est-g-categoria', {
+                type: 'bar',
+                data: { labels: d.por_categoria.map(x => x.categoria), datasets: [{ label: 'Faturamento', data: d.por_categoria.map(x => x.faturamento), backgroundColor: '#2563eb', borderRadius: 4 }] },
+                options: { indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => estBRL(c.parsed.x) } } }, scales: { x: { beginAtZero: true, ticks: { callback: v => 'R$ ' + estNum(v, 0) } } } }
+            });
+
+            // Tabela: produtos mais vendidos
+            const totalFat = d.top_produtos.reduce((s, p) => s + p.faturamento, 0) || 1;
+            document.getElementById('est-tb-produtos').innerHTML = d.top_produtos.length
+                ? d.top_produtos.map((p, i) => {
+                    const pct = k.faturamento > 0 ? (p.faturamento / k.faturamento) * 100 : (p.faturamento / totalFat) * 100;
+                    return `<tr class="border-b hover:bg-gray-50/50">
+                        <td class="p-3 text-gray-400 font-bold">${i + 1}</td>
+                        <td class="p-3 font-medium text-gray-900">${estEsc(p.produto)}${p.sabor ? `<span class="block text-[11px] font-normal text-gray-500">${estEsc(p.sabor)}</span>` : ''}</td>
+                        <td class="p-3 text-right">${estNum(p.quantidade, 0)}</td>
+                        <td class="p-3 text-right font-semibold">${estBRL(p.faturamento)}</td>
+                        <td class="p-3 text-right font-semibold ${p.lucro >= 0 ? 'text-emerald-600' : 'text-red-600'}">${estBRL(p.lucro)}</td>
+                        <td class="p-3"><div class="flex items-center gap-2"><div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-blue-600" style="width:${Math.min(100, pct).toFixed(1)}%"></div></div><span class="text-[11px] text-gray-500 w-10 text-right">${estNum(pct)}%</span></div></td>
+                    </tr>`;
+                }).join('')
+                : '<tr><td colspan="6" class="p-6 text-center text-gray-400">Nenhum produto vendido no período.</td></tr>';
+
+            // Tabela: resumo por dia (mais recente primeiro) + totais
+            const linhasDia = [...d.por_dia].reverse();
+            document.getElementById('est-tb-dias').innerHTML = linhasDia.length
+                ? linhasDia.map(x => `<tr class="border-b hover:bg-gray-50/50">
+                        <td class="p-3 font-medium text-gray-900">${estDataBR(x.dia)}</td><td class="p-3 text-right">${x.pedidos}</td>
+                        <td class="p-3 text-right font-semibold">${estBRL(x.faturamento)}</td>
+                        <td class="p-3 text-right font-semibold ${x.lucro >= 0 ? 'text-emerald-600' : 'text-red-600'}">${estBRL(x.lucro)}</td></tr>`).join('')
+                : '<tr><td colspan="4" class="p-6 text-center text-gray-400">Sem vendas no período.</td></tr>';
+            document.getElementById('est-tf-dias').innerHTML = linhasDia.length
+                ? `<tr class="border-t-2"><td class="p-3">Total</td><td class="p-3 text-right">${k.pedidos}</td><td class="p-3 text-right">${estBRL(k.faturamento)}</td><td class="p-3 text-right ${k.lucro >= 0 ? 'text-emerald-600' : 'text-red-600'}">${estBRL(k.lucro)}</td></tr>` : '';
+
+            // Estoque
+            const e = d.estoque;
+            document.getElementById('est-estoque-cards').innerHTML = [
+                ['Unidades em estoque', estNum(e.resumo.unidades, 0), ''],
+                ['Valor a preço de custo', estBRL(e.resumo.valor_custo), ''],
+                ['Valor a preço de venda', estBRL(e.resumo.valor_venda), 'text-emerald-600'],
+                ['Esgotados / baixos', `${e.resumo.esgotados} / ${e.resumo.baixos}`, e.resumo.esgotados ? 'text-red-600' : 'text-amber-600']
+            ].map(([r, v, c]) => `<div class="bg-gray-50 border border-gray-200 rounded-xl p-3"><div class="text-[11px] font-bold uppercase text-gray-500">${r}</div><div class="text-base sm:text-lg font-extrabold ${c || 'text-gray-900'}">${v}</div></div>`).join('');
+            document.getElementById('est-tb-estoque').innerHTML = e.baixo.length
+                ? e.baixo.map(i => `<tr class="border-b hover:bg-gray-50/50">
+                        <td class="p-3 font-medium text-gray-900">${estEsc(i.nome)}${i.sabor ? `<span class="block text-[11px] font-normal text-gray-500">${estEsc(i.sabor)}</span>` : ''}</td>
+                        <td class="p-3 text-right font-semibold">${i.estoque}</td>
+                        <td class="p-3">${i.nivel === 'esgotado' ? '<span class="bg-red-100 text-red-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">Esgotado</span>' : '<span class="bg-amber-100 text-amber-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">Estoque baixo</span>'}</td></tr>`).join('')
+                : `<tr><td colspan="3" class="p-6 text-center text-gray-400">Nenhum produto com ${e.limite} unidades ou menos.</td></tr>`;
+        }
+
+        // Exportação CSV (separador ";" e BOM, para abrir direto no Excel)
+        function estCsvCelula(v) {
+            if (typeof v === 'number') return String(v).replace('.', ',');
+            let s = String(v ?? '');
+            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+            return `"${s.replace(/"/g, '""')}"`;
+        }
+        function estExportar(tipo) {
+            if (!estDados) return;
+            let cab, linhas, nome;
+            if (tipo === 'produtos') {
+                nome = 'produtos-mais-vendidos';
+                cab = ['Produto', 'Sabor', 'Quantidade', 'Faturamento', 'Lucro'];
+                linhas = estDados.top_produtos.map(p => [p.produto, p.sabor || '', p.quantidade, p.faturamento, p.lucro]);
+            } else {
+                nome = 'resumo-por-dia';
+                cab = ['Data', 'Pedidos', 'Faturamento', 'Lucro'];
+                linhas = estDados.por_dia.map(x => [estDataBR(x.dia), x.pedidos, x.faturamento, x.lucro]);
+            }
+            const csv = '\uFEFF' + [cab, ...linhas].map(l => l.map(estCsvCelula).join(';')).join('\r\n');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+            a.download = `${nome}_${estDados.periodo.de}_a_${estDados.periodo.ate}.csv`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        }
+
+        // Filtros das tabelas de produtos e pedidos
+        let estTimerProd = null, estTimerPed = null;
+        function estBuscarProdutos() { clearTimeout(estTimerProd); estTimerProd = setTimeout(carregarProdutos, 250); }
+        function estBuscarPedidos() { clearTimeout(estTimerPed); estTimerPed = setTimeout(renderizarPedidos, 200); }
 
         async function carregarProdutos() {
             try {
@@ -424,7 +768,10 @@
                 const tbody = document.getElementById('tabela-produtos');
                 tbody.innerHTML = '';
 
+                const termoProd = (document.getElementById('prod-busca')?.value || '').trim().toLowerCase();
+
                 produtosCache.forEach((p, idx) => {
+                    if (termoProd && !String(p.nome || '').toLowerCase().includes(termoProd) && !String(p.marca || '').toLowerCase().includes(termoProd)) return;
                     const celulaOrdem = montarCelulaOrdem(idx, produtosCache.length);
                     const badgeGelo = (p.eh_gelo_especial === 1 || p.eh_gelo_especial === true)
                         ? '<span class="bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">🧊 Gelo Especial</span>'
@@ -473,8 +820,12 @@
                                 <td class="p-3 font-semibold">R$ ${Number(p.preco || 0).toFixed(2).replace('.', ',')}</td>
                                 <td class="p-3 text-blue-600 font-semibold">R$ ${Number(p.preco_atacado || 0).toFixed(2).replace('.', ',')}</td>
                                 <td class="p-3">${badgeGelo}</td>
-                                <td class="p-3">${p.estoque}</td>
-                                <td class="p-3">${p.status}</td>
+                                <td class="p-3 font-semibold ${Number(p.estoque) <= 0 ? 'text-red-600' : Number(p.estoque) <= 5 ? 'text-amber-600' : ''}">${p.estoque}</td>
+                                <td class="p-3">${p.status === 'esgotado' || Number(p.estoque) <= 0
+                                    ? '<span class="bg-red-100 text-red-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">Esgotado</span>'
+                                    : p.status === 'poucas_unidades'
+                                        ? '<span class="bg-amber-100 text-amber-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">Poucas unidades</span>'
+                                        : '<span class="bg-emerald-100 text-emerald-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">Disponível</span>'}</td>
                                 <td class="p-3 text-right space-x-2 whitespace-nowrap">
                                     <button onclick="editarProduto(${p.id})" class="text-blue-600 hover:underline font-semibold">Editar</button>
                                     <button onclick="excluirProduto(${p.id})" class="text-red-600 hover:underline font-semibold">Excluir</button>
@@ -483,6 +834,10 @@
                         `;
                     }
                 });
+
+                if (!tbody.innerHTML.trim()) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400">Nenhum produto encontrado.</td></tr>';
+                }
             } catch (err) {
                 console.error('Erro ao carregar produtos:', err);
             }
@@ -855,10 +1210,37 @@
         async function carregarPedidos() {
             try {
                 const res = await apiFetch(`${API_URL}/pedidos`);
-                const pedidos = await res.json();
-                pedidosCache = pedidos;
+                pedidosCache = await res.json();
+                renderizarPedidos();
+            } catch (err) {
+                console.error('Erro ao carregar pedidos:', err);
+            }
+        }
+
+        function renderizarPedidos() {
+            try {
+                const termo = (document.getElementById('ped-busca')?.value || '').trim().toLowerCase();
+                const statusFiltro = document.getElementById('ped-status')?.value || '';
+
+                const pedidos = pedidosCache.filter(ped =>
+                    (!statusFiltro || ped.status === statusFiltro) &&
+                    (!termo ||
+                        String(ped.id).includes(termo) ||
+                        String(ped.nome_cliente || '').toLowerCase().includes(termo) ||
+                        String(ped.telefone || '').toLowerCase().includes(termo))
+                );
+
+                const totalValido = pedidos
+                    .filter(ped => ped.status !== 'cancelado')
+                    .reduce((soma, ped) => soma + Number(ped.valor_total || 0), 0);
+
+                document.getElementById('ped-resumo').textContent =
+                    `${pedidos.length} pedido(s) listado(s) de ${pedidosCache.length} — total sem cancelados: ${formatarMoeda(totalValido)}`;
+
                 const tbody = document.getElementById('tabela-pedidos');
-                tbody.innerHTML = '';
+                tbody.innerHTML = pedidos.length
+                    ? ''
+                    : '<tr><td colspan="6" class="p-6 text-center text-gray-400">Nenhum pedido encontrado.</td></tr>';
 
                 pedidos.forEach(ped => {
                     const itensTexto = ped.itens.map(i => `${i.quantidade}x ${i.nome}`).join('<br>');
@@ -902,7 +1284,7 @@
                             </td>
                             <td class="p-3 text-right whitespace-nowrap space-x-2">
                                 <button onclick="abrirNota(${ped.id})" class="text-blue-600 hover:underline font-semibold">Gerar Nota</button>
-                                <button onclick="excluirPedido(${ped.id})" class="text-red-600 hover:uideline font-semibold">Excluir</button>
+                                <button onclick="excluirPedido(${ped.id})" class="text-red-600 hover:underline font-semibold">Excluir</button>
                             </td>
                         </tr>
                     `;
