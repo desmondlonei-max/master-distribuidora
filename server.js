@@ -1,1190 +1,223 @@
-const express = require('express');
-const mysql = require('mysql2/promise');
-const cors = require('cors');
-const path = require('path');
+/* Testa as rotas REAIS de COMBOS (cadastro em /api/combos e venda via POST /api/vendas com unidade 'combo',
+ * cancelar, excluir, restaurar) com um MySQL SIMULADO em memória — não precisa de banco. Uso: npm run test:combos
+ * (O fluxo contra um MySQL de verdade continua em scripts/testes-integracao.js.) */
+const assert = require('assert');
 const crypto = require('crypto');
-require('dotenv').config();
+process.env.JWT_SECRET = crypto.randomBytes(24).toString('hex');
+const jwt = require('jsonwebtoken');
+const { app, pool } = require('../server');
 
-const app = express();
-app.use(express.json());
-app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
+/* ---------- banco simulado (só as consultas usadas por estas rotas) ---------- */
+let S; // estado
+const novoEstado = () => ({
+  produtos: {
+    1: { id: 1, nome: 'Vodka', quantidade: 3, ml_avulso: 0, volume_ml: 1000, preco_custo: 80, ativo: 1 },
+    2: { id: 2, nome: 'Gelo', quantidade: 50, ml_avulso: 0, volume_ml: null, preco_custo: 1, ativo: 1 },
+    3: { id: 3, nome: 'Energético', quantidade: 24, ml_avulso: 0, volume_ml: 269, preco_custo: 6, ativo: 1 },
+    4: { id: 4, nome: 'Whisky', quantidade: 2, ml_avulso: 0, volume_ml: 1000, preco_custo: 120, ativo: 1 }
+  },
+  vendas: {}, itens: [], ings: [], movs: [], pags: [], auditoria: [], receitas: [], combos: [], comboItens: [], seq: { venda: 0, item: 0, ing: 0, rec: 0, combo: 0, cit: 0 }
+});
+const clone = o => JSON.parse(JSON.stringify(o));
+let snapshot = null;
+async function query(sql, p = []) {
+  const q = sql.replace(/\s+/g, ' ').trim();
+  const R = x => [x];
+  if (/FROM usuarios WHERE id=\? AND ativo=1/.test(q)) return R([{ id: 1, nome: 'Admin', perfil: 'admin' }]);
+  if (/^SELECT id FROM vendas WHERE token_unico=\?/.test(q)) return R(Object.values(S.vendas).filter(v => v.token_unico === p[0]).map(v => ({ id: v.id })));
+  if (/^SELECT id, nome, quantidade, ml_avulso, volume_ml, preco_custo, ativo FROM produtos WHERE id=\? FOR UPDATE/.test(q)) return R(S.produtos[p[0]] ? [{ ...S.produtos[p[0]] }] : []);
+  if (/^INSERT INTO vendas /.test(q)) { const id = ++S.seq.venda; S.vendas[id] = { id, token_unico: p[0], total: p[6], subtotal: p[4], desconto: p[5], cancelada: 0, excluida_em: null, data_venda: p[2], cliente_id: p[1] }; return R({ insertId: id }); }
+  if (/^INSERT INTO itens_venda_ingredientes/.test(q)) { S.ings.push({ id: ++S.seq.ing, item_id: p[0], produto_id: p[1], quantidade: p[2], ml_unitario: p[3], ml_baixado: p[4], custo: p[5] }); return R({ insertId: 1 }); }
+  if (/^INSERT INTO itens_venda /.test(q)) { const id = ++S.seq.item; S.itens.push({ id, venda_id: p[0], produto_id: p[1], descricao: p[2], quantidade: p[3], unidade: p[4], ml_unitario: p[5], ml_baixado: p[6], preco_unitario: p[7], custo_unitario: p[8], desconto: p[9], subtotal: p[10] }); return R({ insertId: id }); }
+  if (/^UPDATE produtos SET quantidade=\?, ml_avulso=\? WHERE id=\?/.test(q)) { S.produtos[p[2]].quantidade = p[0]; S.produtos[p[2]].ml_avulso = p[1]; return R({ affectedRows: 1 }); }
+  if (/^UPDATE produtos SET quantidade=\? WHERE id=\?/.test(q)) { S.produtos[p[1]].quantidade = p[0]; return R({ affectedRows: 1 }); }
+  if (/^INSERT INTO movimentacoes_estoque/.test(q)) { S.movs.push({ produto_id: p[0], tipo: p[1], quantidade: p[2], unidade: p[3], saldo_apos: p[4], saldo_ml_apos: p[5], motivo: p[6], venda_id: p[7] }); return R({ insertId: 1 }); }
+  if (/^INSERT INTO pagamentos/.test(q)) { S.pags.push({ venda_id: p[1], valor: p[3] }); return R({ insertId: 1 }); }
+  if (/^INSERT INTO auditoria/.test(q)) { S.auditoria.push({ acao: p[2], entidade_id: p[4] }); return R({ insertId: 1 }); }
+  if (/^SELECT id, total, cancelada, excluida_em FROM vendas WHERE id=\? FOR UPDATE/.test(q)) return R(S.vendas[p[0]] ? [S.vendas[p[0]]] : []);
+  if (/^SELECT \* FROM vendas WHERE id=\? FOR UPDATE/.test(q)) return R(S.vendas[p[0]] ? [S.vendas[p[0]]] : []);
+  if (/^SELECT COUNT\(\*\) AS n FROM pagamentos WHERE venda_id=\?/.test(q)) return R([{ n: S.pags.filter(x => x.venda_id === p[0]).length }]);
+  if (/^SELECT id, valor, data_pagamento, forma_pagamento FROM pagamentos WHERE venda_id=\?/.test(q)) return R(S.pags.filter(x => x.venda_id === p[0]));
+  if (/^SELECT COUNT\(\*\) AS nItens FROM itens_venda WHERE venda_id=\?/.test(q)) return R([{ nItens: S.itens.filter(i => i.venda_id === p[0]).length }]);
+  if (/^SELECT produto_id, quantidade, unidade, ml_unitario FROM itens_venda WHERE venda_id=\? AND produto_id IS NOT NULL/.test(q)) return R(S.itens.filter(i => i.venda_id === p[0] && i.produto_id !== null).map(i => ({ produto_id: i.produto_id, quantidade: i.quantidade, unidade: i.unidade, ml_unitario: i.ml_unitario })));
+  if (/FROM itens_venda_ingredientes g JOIN itens_venda i/.test(q)) return R(S.ings.filter(g => S.itens.find(i => i.id === g.item_id).venda_id === p[0]).map(g => ({ produto_id: g.produto_id, quantidade: g.quantidade * S.itens.find(i => i.id === g.item_id).quantidade, unidade: g.ml_unitario === null ? 'unidade' : 'copo', ml_unitario: g.ml_unitario })));
+  if (/^UPDATE vendas SET cancelada=1/.test(q)) { S.vendas[p[0]].cancelada = 1; return R({ affectedRows: 1 }); }
+  if (/^UPDATE vendas SET excluida_em=NOW\(\)/.test(q)) { if (S.vendas[p[2]].excluida_em) return R({ affectedRows: 0 }); S.vendas[p[2]].excluida_em = 'agora'; return R({ affectedRows: 1 }); }
+  if (/^UPDATE vendas SET excluida_em=NULL/.test(q)) { S.vendas[p[0]].excluida_em = null; return R({ affectedRows: 1 }); }
+  if (/^SELECT id FROM produtos WHERE id IN \(\?\) AND ativo=1/.test(q)) return R(p[0].filter(id => S.produtos[id] && S.produtos[id].ativo).map(id => ({ id })));
+  if (/^INSERT INTO copao_receitas/.test(q)) { let r = S.receitas.find(x => x.nome === p[0]); if (r) { r.preco = p[1]; r.ingredientes = p[2]; } else S.receitas.push({ id: ++S.seq.rec, nome: p[0], preco: p[1], ingredientes: p[2] }); return R({ affectedRows: 1 }); }
+  if (/^SELECT id FROM copao_receitas WHERE nome=\?/.test(q)) return R(S.receitas.filter(x => x.nome === p[0]).map(x => ({ id: x.id })));
+  if (/^SELECT id, nome, preco, ingredientes FROM copao_receitas/.test(q)) return R(S.receitas);
+  if (/^DELETE FROM copao_receitas WHERE id=\?/.test(q)) { const n = S.receitas.length; S.receitas = S.receitas.filter(x => x.id !== p[0] && String(x.id) !== String(p[0])); return R({ affectedRows: n - S.receitas.length }); }
+  /* ---- combos ---- */
+  if (/^SELECT id(, nome)? FROM combos WHERE id=\?( FOR UPDATE)?$/.test(q)) return R(S.combos.filter(c => String(c.id) === String(p[0])).map(c => ({ id: c.id, nome: c.nome })));
+  if (/^SELECT produto_id, quantidade, ml_unitario FROM combo_itens WHERE combo_id=\? ORDER BY id/.test(q)) return R(S.comboItens.filter(x => x.combo_id === p[0]).map(x => ({ produto_id: x.produto_id, quantidade: x.quantidade, ml_unitario: x.ml_unitario })));
+  if (/^SELECT id, nome, preco FROM combos c ORDER BY nome/.test(q)) return R([...S.combos].sort((a, b) => a.nome.localeCompare(b.nome)).map(c => ({ id: c.id, nome: c.nome, preco: c.preco })));
+  if (/FROM combo_itens ci JOIN produtos p ON p.id = ci.produto_id WHERE ci.combo_id IN/.test(q)) return R(S.comboItens.filter(x => p[0].includes(x.combo_id)).map(x => {
+    const pr = S.produtos[x.produto_id];
+    return { combo_id: x.combo_id, produto_id: x.produto_id, quantidade: x.quantidade, ml_unitario: x.ml_unitario, produto_nome: pr.nome, ativo: pr.ativo, preco_custo: pr.preco_custo, volume_ml: pr.volume_ml, estoque_un: pr.quantidade, estoque_ml: pr.volume_ml ? pr.quantidade * pr.volume_ml + pr.ml_avulso : null };
+  }));
+  if (/^SELECT id, nome, volume_ml FROM produtos WHERE id IN \(\?\) AND ativo=1/.test(q)) return R(p[0].filter(id => S.produtos[id] && S.produtos[id].ativo).map(id => ({ id, nome: S.produtos[id].nome, volume_ml: S.produtos[id].volume_ml })));
+  if (/^INSERT INTO combos \(nome, preco\)/.test(q)) { if (S.combos.some(c => c.nome === p[0])) throw Object.assign(new Error('dup'), { code: 'ER_DUP_ENTRY' }); const id = ++S.seq.combo; S.combos.push({ id, nome: p[0], preco: p[1] }); return R({ insertId: id }); }
+  if (/^UPDATE combos SET nome=\?, preco=\? WHERE id=\?/.test(q)) { if (S.combos.some(c => c.nome === p[0] && c.id !== p[2])) throw Object.assign(new Error('dup'), { code: 'ER_DUP_ENTRY' }); const c = S.combos.find(x => x.id === p[2]); c.nome = p[0]; c.preco = p[1]; return R({ affectedRows: 1 }); }
+  if (/^DELETE FROM combo_itens WHERE combo_id=\?/.test(q)) { S.comboItens = S.comboItens.filter(x => x.combo_id !== p[0]); return R({ affectedRows: 1 }); }
+  if (/^INSERT INTO combo_itens/.test(q)) { S.comboItens.push({ id: ++S.seq.cit, combo_id: p[0], produto_id: p[1], quantidade: p[2], ml_unitario: p[3] }); return R({ insertId: S.seq.cit }); }
+  if (/^DELETE FROM combos WHERE id=\?/.test(q)) { S.combos = S.combos.filter(c => c.id !== p[0]); S.comboItens = S.comboItens.filter(x => x.combo_id !== p[0]); return R({ affectedRows: 1 }); }
+  if (/^SELECT DISTINCT c\.nome FROM combo_itens ci JOIN combos c/.test(q)) return R([...new Set(S.comboItens.filter(x => String(x.produto_id) === String(p[0])).map(x => S.combos.find(c => c.id === x.combo_id).nome))].map(nome => ({ nome })));
+  if (/^UPDATE produtos SET ativo=0 WHERE id=\? AND ativo=1/.test(q)) { const pr = S.produtos[p[0]]; if (!pr || !pr.ativo) return R({ affectedRows: 0 }); pr.ativo = 0; return R({ affectedRows: 1 }); }
+  throw new Error('Consulta não prevista no banco simulado: ' + q.slice(0, 120));
+}
+const conexao = { query, async beginTransaction() { snapshot = clone(S); }, async commit() { snapshot = null; }, async rollback() { if (snapshot) { S = snapshot; snapshot = null; } }, release() {} };
+pool.getConnection = async () => conexao;
+pool.query = query;
+// o rollback troca o objeto de estado; as funções acima sempre leem a variável S atual
 
-const dbConfig = {
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'adega_db',
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
+/* ---------- ferramentas de teste ---------- */
+const srv = app.listen(0);
+const base = `http://127.0.0.1:${srv.address().port}`;
+const tk = jwt.sign({ id: 1 }, process.env.JWT_SECRET, { expiresIn: '1h' });
+const api = async (m, u, corpo) => {
+  const r = await fetch(base + u, { method: m, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk }, body: corpo ? JSON.stringify(corpo) : undefined });
+  return { status: r.status, b: await r.json().catch(() => ({})) };
 };
-
-const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || '').trim();
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
-
-// Diagnóstico: confirma se as variáveis foram carregadas, sem expor os valores.
-// Se aparecer "false" aqui nos logs do serviço, a variável não está configurada
-// no ambiente onde o servidor está rodando (não é sobre o .env local).
-console.log('[config] ADMIN_PASSWORD definido:', Boolean(ADMIN_PASSWORD));
-console.log('[config] ADMIN_SECRET definido:', Boolean(ADMIN_SECRET));
-
-// Regra do GELO DE CUBO (normal): 1 ou 2 unidades = R$ 7,00 cada | 3 unidades ou mais = R$ 5,00 cada.
-// A quantidade considerada é o total do produto no carrinho (somando todos os sabores/variações dele).
-const GELO_CUBO_PRECO = 7.00;
-const GELO_CUBO_PRECO_PROMO = 5.00;
-const GELO_CUBO_QTD_PROMO = 3;
-
-function precoGeloCubo(quantidade) {
-    return Number(quantidade) >= GELO_CUBO_QTD_PROMO ? GELO_CUBO_PRECO_PROMO : GELO_CUBO_PRECO;
-}
-
-function criarTokenAdmin() {
-    const payload = Buffer.from(JSON.stringify({ role: 'admin', exp: Date.now() + 12 * 60 * 60 * 1000 })).toString('base64url');
-    const assinatura = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
-    return `${payload}.${assinatura}`;
-}
-
-function autenticarAdmin(req, res, next) {
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-    const [payload, assinatura] = token.split('.');
-
-    if (!payload || !assinatura || !ADMIN_SECRET) {
-        return res.status(401).json({ erro: 'Não autorizado.' });
-    }
-
-    const assinaturaEsperada = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
-
-    if (assinatura.length !== assinaturaEsperada.length || !crypto.timingSafeEqual(Buffer.from(assinatura), Buffer.from(assinaturaEsperada))) {
-        return res.status(401).json({ erro: 'Token inválido.' });
-    }
-
-    try {
-        const dados = JSON.parse(Buffer.from(payload, 'base64url').toString());
-
-        if (dados.role !== 'admin' || dados.exp < Date.now()) {
-            return res.status(401).json({ erro: 'Sessão expirada.' });
-        }
-    } catch {
-        return res.status(401).json({ erro: 'Token inválido.' });
-    }
-
-    next();
-}
-
-app.post('/admin/login', (req, res) => {
-    const { senha } = req.body || {};
-
-    if (!ADMIN_PASSWORD || senha !== ADMIN_PASSWORD) {
-        return res.status(401).json({ erro: 'Senha incorreta!' });
-    }
-
-    res.json({ token: criarTokenAdmin() });
-});
-
-// ==========================================
-// ROTAS DE PRODUTOS
-// ==========================================
-
-// Busca todas as variações (sabores) de uma vez e agrupa por produto_id.
-// Evita N+1 queries ao montar a lista de produtos.
-async function buscarVariacoesAgrupadas(connection) {
-    const [variacoes] = await connection.execute(
-        'SELECT id, produto_id, sabor, preco, preco_promocional, preco_atacado, preco_custo, estoque, imagem, status FROM produto_variacoes'
-    );
-
-    const porProduto = {};
-    for (const v of variacoes) {
-        if (!porProduto[v.produto_id]) porProduto[v.produto_id] = [];
-        porProduto[v.produto_id].push(v);
-    }
-
-    return porProduto;
-}
-
-// ==========================================
-// ROTAS DE CATEGORIAS
-// ==========================================
-
-app.get('/categorias', async (req, res) => {
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute(
-            'SELECT id, nome, slug FROM categorias ORDER BY nome'
-        );
-        res.json(rows);
-    } catch (erro) {
-        console.error('Erro ao buscar categorias:', erro);
-        res.status(500).json({ erro: 'Erro interno ao buscar categorias.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.post('/categorias', autenticarAdmin, async (req, res) => {
-    const { nome } = req.body;
-
-    if (!nome || !nome.trim()) {
-        return res.status(400).json({ erro: 'Informe o nome da categoria.' });
-    }
-
-    const slug = nome
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        const [resultado] = await connection.execute(
-            'INSERT INTO categorias (nome, slug) VALUES (?, ?)',
-            [nome.trim(), slug]
-        );
-
-        res.status(201).json({ sucesso: true, id: resultado.insertId, nome: nome.trim(), slug });
-    } catch (erro) {
-        console.error('Erro ao criar categoria:', erro);
-
-        if (erro.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ erro: 'Já existe uma categoria com esse nome.' });
-        }
-
-        res.status(500).json({ erro: 'Erro interno ao criar categoria.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.get('/produtos', async (req, res) => {
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const [rows] = await connection.execute(
-            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, eh_gelo_cubo, possui_variacoes, ordem FROM produtos ORDER BY ordem ASC, id ASC'
-        );
-
-        const variacoesPorProduto = await buscarVariacoesAgrupadas(connection);
-
-        const produtos = rows.map(p => ({
-            ...p,
-            variacoes: p.possui_variacoes ? (variacoesPorProduto[p.id] || []) : []
-        }));
-
-        res.json(produtos);
-    } catch (erro) {
-        console.error('Erro ao buscar produtos:', erro);
-        res.status(500).json({ erro: 'Erro interno ao buscar produtos.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.get('/produtos-destaque', async (req, res) => {
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const [rows] = await connection.execute(
-            'SELECT id, nome, categoria_id, marca, preco, preco_atacado, preco_custo, volume, teor_alcoolico, estoque, imagem, descricao, status, destaque, sabores, eh_gelo_especial, eh_gelo_cubo, possui_variacoes, ordem FROM produtos WHERE destaque = 1 ORDER BY ordem ASC, id ASC LIMIT 2'
-        );
-
-        const variacoesPorProduto = await buscarVariacoesAgrupadas(connection);
-
-        const produtos = rows.map(p => ({
-            ...p,
-            variacoes: p.possui_variacoes ? (variacoesPorProduto[p.id] || []) : []
-        }));
-
-        res.json(produtos);
-    } catch (erro) {
-        console.error('Erro ao buscar produtos em destaque:', erro);
-        res.status(500).json({ erro: 'Erro interno ao buscar destaques.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-// ==========================================
-// ROTAS DE VARIAÇÕES (SABORES)
-// ==========================================
-
-// Cadastro agrupado: cria o produto base + todas as variações (sabores) numa transação
-app.post('/produtos/agrupado', autenticarAdmin, async (req, res) => {
-    const {
-        nome,
-        categoria_id,
-        marca,
-        descricao,
-        volume,
-        teor_alcoolico,
-        destaque,
-        eh_gelo_especial,
-        eh_gelo_cubo,
-        variacoes
-    } = req.body;
-
-    if (!nome || !nome.trim()) {
-        return res.status(400).json({ erro: 'Informe o nome do produto base.' });
-    }
-
-    if (!Array.isArray(variacoes) || variacoes.length === 0) {
-        return res.status(400).json({ erro: 'Informe ao menos uma variação (sabor).' });
-    }
-
-    for (const v of variacoes) {
-        if (!v.sabor || !v.sabor.trim() || v.preco === undefined || v.preco === null || v.preco === '') {
-            return res.status(400).json({ erro: 'Cada variação precisa de sabor e preço.' });
-        }
-    }
-
-    const isDestaque = destaque ? 1 : 0;
-    const isGeloEspecial = eh_gelo_especial ? 1 : 0;
-    const isGeloCubo = (eh_gelo_cubo && !isGeloEspecial) ? 1 : 0; // um produto é gelo especial OU gelo de cubo
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        await connection.beginTransaction();
-
-        const [[{ proxima }]] = await connection.execute(
-            'SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima FROM produtos'
-        );
-
-        const [resultadoProduto] = await connection.execute(
-            `INSERT INTO produtos
-                (nome, categoria_id, marca, descricao, volume, teor_alcoolico,
-                 preco, estoque, status, destaque, eh_gelo_especial, eh_gelo_cubo, possui_variacoes, ordem)
-             VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'disponivel', ?, ?, ?, 1, ?)`,
-            [
-                nome,
-                categoria_id || 1,
-                marca || null,
-                descricao || null,
-                volume || null,
-                teor_alcoolico || null,
-                isDestaque,
-                isGeloEspecial,
-                isGeloCubo,
-                proxima
-            ]
-        );
-
-        const produtoId = resultadoProduto.insertId;
-
-        for (const v of variacoes) {
-            await connection.execute(
-                `INSERT INTO produto_variacoes
-                    (produto_id, sabor, preco, preco_promocional, preco_atacado, preco_custo, estoque, imagem, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    produtoId,
-                    v.sabor,
-                    v.preco,
-                    v.preco_promocional || null,
-                    v.preco_atacado || 0,
-                    v.preco_custo || 0,
-                    v.estoque || 0,
-                    v.imagem || null,
-                    v.status || 'disponivel'
-                ]
-            );
-        }
-
-        await connection.commit();
-
-        res.status(201).json({
-            sucesso: true,
-            produto_id: produtoId,
-            mensagem: 'Produto com variações cadastrado com sucesso!'
-        });
-    } catch (erro) {
-        if (connection) {
-            try { await connection.rollback(); } catch {}
-        }
-        console.error('Erro ao cadastrar produto agrupado:', erro);
-        res.status(500).json({ erro: 'Erro ao cadastrar produto com variações.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-// Adiciona uma nova variação (sabor) a um produto base já existente
-app.post('/produtos/:id/variacoes', autenticarAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { sabor, preco, preco_promocional, preco_atacado, preco_custo, estoque, imagem, status } = req.body;
-
-    if (!sabor || !sabor.trim() || preco === undefined || preco === null || preco === '') {
-        return res.status(400).json({ erro: 'Informe sabor e preço da variação.' });
-    }
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        await connection.beginTransaction();
-
-        const [produtoRows] = await connection.execute(
-            'SELECT id FROM produtos WHERE id = ?',
-            [id]
-        );
-
-        if (produtoRows.length === 0) {
-            throw new Error('Produto base não encontrado.');
-        }
-
-        await connection.execute(
-            `INSERT INTO produto_variacoes
-                (produto_id, sabor, preco, preco_promocional, preco_atacado, preco_custo, estoque, imagem, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                id,
-                sabor,
-                preco,
-                preco_promocional || null,
-                preco_atacado || 0,
-                preco_custo || 0,
-                estoque || 0,
-                imagem || null,
-                status || 'disponivel'
-            ]
-        );
-
-        // Garante que o produto base fique marcado como "com variações"
-        await connection.execute(
-            'UPDATE produtos SET possui_variacoes = 1 WHERE id = ?',
-            [id]
-        );
-
-        await connection.commit();
-
-        res.status(201).json({ sucesso: true, mensagem: 'Variação adicionada com sucesso!' });
-    } catch (erro) {
-        if (connection) {
-            try { await connection.rollback(); } catch {}
-        }
-        console.error('Erro ao adicionar variação:', erro);
-        res.status(500).json({ erro: erro.message || 'Erro ao adicionar variação.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-// Edita uma variação específica (estoque, preço, imagem, status), como se fosse um produto individual
-app.put('/produto-variacoes/:id', autenticarAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { sabor, preco, preco_promocional, preco_atacado, preco_custo, estoque, imagem, status } = req.body;
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        await connection.execute(
-            `UPDATE produto_variacoes
-             SET sabor = ?, preco = ?, preco_promocional = ?, preco_atacado = ?,
-                 preco_custo = ?, estoque = ?, imagem = ?, status = ?
-             WHERE id = ?`,
-            [
-                sabor,
-                preco,
-                preco_promocional || null,
-                preco_atacado || 0,
-                preco_custo || 0,
-                estoque,
-                imagem || null,
-                status || 'disponivel',
-                id
-            ]
-        );
-
-        res.json({ sucesso: true, mensagem: 'Variação atualizada com sucesso!' });
-    } catch (erro) {
-        console.error('Erro ao atualizar variação:', erro);
-        res.status(500).json({ erro: 'Erro ao atualizar variação.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-// Remove uma variação específica
-app.delete('/produto-variacoes/:id', autenticarAdmin, async (req, res) => {
-    const { id } = req.params;
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        await connection.execute('DELETE FROM produto_variacoes WHERE id = ?', [id]);
-
-        res.json({ sucesso: true, mensagem: 'Variação excluída com sucesso!' });
-    } catch (erro) {
-        console.error('Erro ao excluir variação:', erro);
-        res.status(500).json({ erro: 'Erro ao excluir variação.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.post('/produtos', autenticarAdmin, async (req, res) => {
-    const {
-        nome,
-        categoria_id,
-        marca,
-        preco,
-        preco_atacado,
-        preco_custo,
-        volume,
-        teor_alcoolico,
-        estoque,
-        imagem,
-        descricao,
-        status,
-        destaque,
-        sabores,
-        eh_gelo_especial,
-        eh_gelo_cubo
-    } = req.body;
-
-    const isDestaque = destaque ? 1 : 0;
-    const isGeloEspecial = eh_gelo_especial ? 1 : 0;
-    const isGeloCubo = (eh_gelo_cubo && !isGeloEspecial) ? 1 : 0; // um produto é gelo especial OU gelo de cubo
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const [[{ proxima }]] = await connection.execute(
-            'SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima FROM produtos'
-        );
-
-        const query = `
-            INSERT INTO produtos (
-                nome,
-                categoria_id,
-                marca,
-                preco,
-                preco_atacado,
-                preco_custo,
-                volume,
-                teor_alcoolico,
-                estoque,
-                imagem,
-                descricao,
-                status,
-                destaque,
-                sabores,
-                eh_gelo_especial,
-                eh_gelo_cubo,
-                ordem
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        await connection.execute(query, [
-            nome,
-            categoria_id || 1,
-            marca,
-            preco,
-            preco_atacado || 0,
-            preco_custo || 0,
-            volume,
-            teor_alcoolico,
-            estoque,
-            imagem,
-            descricao,
-            status || 'disponivel',
-            isDestaque,
-            sabores || null,
-            isGeloEspecial,
-            isGeloCubo,
-            proxima
-        ]);
-
-        res.status(201).json({
-            sucesso: true,
-            mensagem: 'Produto cadastrado com sucesso!'
-        });
-    } catch (erro) {
-        console.error('Erro ao cadastrar produto:', erro);
-        res.status(500).json({
-            erro: 'Erro ao cadastrar produto.'
-        });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-// Salva a ordem de exibição dos produtos (a ordem do array = ordem no site)
-app.put('/produtos-ordem', autenticarAdmin, async (req, res) => {
-    const ids = req.body && req.body.ids;
-
-    if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => !Number.isInteger(Number(id)))) {
-        return res.status(400).json({ erro: 'Lista de produtos inválida.' });
-    }
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        await connection.beginTransaction();
-
-        for (let i = 0; i < ids.length; i++) {
-            await connection.execute('UPDATE produtos SET ordem = ? WHERE id = ?', [i + 1, Number(ids[i])]);
-        }
-
-        await connection.commit();
-        res.json({ sucesso: true });
-    } catch (erro) {
-        if (connection) {
-            try { await connection.rollback(); } catch {}
-        }
-        console.error('Erro ao salvar ordem dos produtos:', erro);
-        res.status(500).json({ erro: 'Erro ao salvar a ordem dos produtos.' });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.put('/produtos/:id', autenticarAdmin, async (req, res) => {
-    const { id } = req.params;
-
-    const {
-        nome,
-        categoria_id,
-        marca,
-        preco,
-        preco_atacado,
-        preco_custo,
-        volume,
-        teor_alcoolico,
-        estoque,
-        imagem,
-        descricao,
-        status,
-        destaque,
-        sabores,
-        eh_gelo_especial,
-        eh_gelo_cubo
-    } = req.body;
-
-    const isDestaque = destaque ? 1 : 0;
-    const isGeloEspecial = eh_gelo_especial ? 1 : 0;
-    const isGeloCubo = (eh_gelo_cubo && !isGeloEspecial) ? 1 : 0; // um produto é gelo especial OU gelo de cubo
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const query = `
-            UPDATE produtos
-            SET
-                nome = ?,
-                categoria_id = ?,
-                marca = ?,
-                preco = ?,
-                preco_atacado = ?,
-                preco_custo = ?,
-                volume = ?,
-                teor_alcoolico = ?,
-                estoque = ?,
-                imagem = ?,
-                descricao = ?,
-                status = ?,
-                destaque = ?,
-                sabores = ?,
-                eh_gelo_especial = ?,
-                eh_gelo_cubo = ?
-            WHERE id = ?
-        `;
-
-        await connection.execute(query, [
-            nome,
-            categoria_id || 1,
-            marca,
-            preco,
-            preco_atacado || 0,
-            preco_custo || 0,
-            volume,
-            teor_alcoolico,
-            estoque,
-            imagem,
-            descricao,
-            status || 'disponivel',
-            isDestaque,
-            sabores || null,
-            isGeloEspecial,
-            isGeloCubo,
-            id
-        ]);
-
-        res.json({
-            sucesso: true,
-            mensagem: 'Produto atualizado com sucesso!'
-        });
-    } catch (erro) {
-        console.error('Erro ao atualizar produto:', erro);
-        res.status(500).json({
-            erro: 'Erro ao atualizar produto.'
-        });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.delete('/produtos/:id', autenticarAdmin, async (req, res) => {
-    const { id } = req.params;
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        await connection.execute(
-            'DELETE FROM produtos WHERE id = ?',
-            [id]
-        );
-
-        res.json({
-            sucesso: true,
-            mensagem: 'Produto excluído com sucesso!'
-        });
-    } catch (erro) {
-        console.error('Erro ao excluir produto:', erro);
-        res.status(500).json({
-            erro: 'Erro ao excluir produto.'
-        });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-// ==========================================
-// ROTAS DE PEDIDOS E RELATÓRIO
-// ==========================================
-
-app.get('/pedidos', autenticarAdmin, async (req, res) => {
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const [pedidos] = await connection.execute(
-            'SELECT id, nome_cliente, telefone, endereco, valor_total, taxa_entrega, tipo_entrega, forma_pagamento, troco_para, status, data_criacao FROM pedidos ORDER BY id DESC'
-        );
-
-        const pedidosComItens = [];
-
-        for (let ped of pedidos) {
-            const [itens] = await connection.execute(`
-                SELECT
-                    ip.quantidade,
-                    ip.preco AS preco,
-                    p.nome,
-                    p.sabores,
-                    v.sabor AS sabor_variacao
-                FROM itens_pedido ip
-                INNER JOIN produtos p ON ip.produto_id = p.id
-                LEFT JOIN produto_variacoes v ON ip.variacao_id = v.id
-                WHERE ip.pedido_id = ?
-            `, [ped.id]);
-
-            pedidosComItens.push({
-                ...ped,
-                itens
-            });
-        }
-
-        res.json(pedidosComItens);
-    } catch (erro) {
-        console.error('Erro ao buscar pedidos:', erro);
-        res.status(500).json({
-            erro: 'Erro interno ao buscar pedidos.'
-        });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.post('/pedidos', async (req, res) => {
-    const {
-        nome_cliente,
-        telefone,
-        endereco,
-        tipo_entrega,
-        forma_pagamento,
-        troco_para,
-        itens
-    } = req.body;
-
-    if (!itens || itens.length === 0) {
-        return res.status(400).json({
-            erro: 'O carrinho está vazio.'
-        });
-    }
-
-    // Normaliza valores vindos do front-end, nunca confiando neles para o preço final.
-    const tipoEntregaFinal = tipo_entrega === 'retirada' ? 'retirada' : 'entrega';
-    const formaPagamentoFinal = forma_pagamento === 'dinheiro' ? 'dinheiro' : 'pix';
-    const trocoParaFinal =
-        (formaPagamentoFinal === 'dinheiro' && troco_para) ? Number(troco_para) : null;
-
-    if (tipoEntregaFinal === 'entrega' && (!endereco || !endereco.trim())) {
-        return res.status(400).json({
-            erro: 'Informe o endereço de entrega ou escolha "Retirar na loja".'
-        });
-    }
-
-    // Taxa fixa de entrega: soma R$5,00 quando o pedido é para entrega (não se aplica à retirada).
-    // Calculada aqui (servidor), nunca confiando no valor que o front-end mandar.
-    const taxaEntrega = tipoEntregaFinal === 'entrega' ? 5.00 : 0.00;
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        await connection.beginTransaction();
-
-        const produtosDoPedido = [];
-        const itensComDados = [];
-
-        // 1ª passada: busca os dados de cada item (produto ou variação) e valida estoque.
-        for (let item of itens) {
-            // Se o item veio com variacao_id, os dados de estoque/preço vêm da variação (sabor),
-            // não do produto base — cada sabor tem seu próprio estoque e preço.
-            let produtoDb;
-            let variacaoId = null;
-
-            if (item.variacao_id) {
-                const [variacaoRows] = await connection.execute(
-                    `SELECT v.id AS variacao_id, v.estoque, v.preco, v.preco_atacado,
-                            p.id, p.nome, p.eh_gelo_especial, p.eh_gelo_cubo
-                     FROM produto_variacoes v
-                     INNER JOIN produtos p ON v.produto_id = p.id
-                     WHERE v.id = ? AND v.produto_id = ?`,
-                    [item.variacao_id, item.id]
-                );
-
-                if (variacaoRows.length === 0) {
-                    throw new Error(`Variação ID ${item.variacao_id} não encontrada.`);
-                }
-
-                const variacaoDb = variacaoRows[0];
-                variacaoId = variacaoDb.variacao_id;
-                produtoDb = variacaoDb;
-            } else {
-                const [rows] = await connection.execute(
-                    'SELECT id, estoque, nome, preco, preco_atacado, eh_gelo_especial, eh_gelo_cubo FROM produtos WHERE id = ?',
-                    [item.id]
-                );
-
-                if (rows.length === 0) {
-                    throw new Error(`Produto ID ${item.id} não encontrado.`);
-                }
-
-                produtoDb = rows[0];
-            }
-
-            if (produtoDb.estoque < item.quantidade) {
-                throw new Error(
-                    `Estoque insuficiente para "${produtoDb.nome}". Disponível: ${produtoDb.estoque}`
-                );
-            }
-
-            itensComDados.push({ item, produtoDb, variacaoId });
-        }
-
-        // Soma as quantidades de gelo especial por PRODUTO BASE (não por sabor), já que
-        // a faixa de preço (1un / 6un / >10un) considera o total comprado do produto,
-        // somando todos os sabores dele.
-        const qtdGeloPorProduto = {};
-
-        for (const { item, produtoDb } of itensComDados) {
-            if (produtoDb.eh_gelo_especial || produtoDb.eh_gelo_cubo) {
-                qtdGeloPorProduto[produtoDb.id] =
-                    (qtdGeloPorProduto[produtoDb.id] || 0) + Number(item.quantidade);
-            }
-        }
-
-        // 2ª passada: calcula o preço de cada item já considerando a quantidade agregada do gelo.
-        for (const { item, produtoDb, variacaoId } of itensComDados) {
-
-            let precoBaseItem = Number(produtoDb.preco);
-
-            // Regra do gelo especial: 1-4un R$4/un / 5-9un R$3,33/un / 10-39un R$2,50/un / 40un+ R$2,00/un
-            if (produtoDb.eh_gelo_especial) {
-                const qtd = qtdGeloPorProduto[produtoDb.id];
-
-                if (qtd >= 40) {
-                    precoBaseItem = 2.00;
-                } else if (qtd >= 10) {
-                    precoBaseItem = 2.50;
-                } else if (qtd >= 5) {
-                    precoBaseItem = 3.33;
-                } else {
-                    precoBaseItem = 4.00;
-                }
-            }
-
-            // Regra do gelo de cubo (normal): 1-2un R$7,00/un | 3un+ R$5,00/un
-            if (!produtoDb.eh_gelo_especial && produtoDb.eh_gelo_cubo) {
-                precoBaseItem = precoGeloCubo(qtdGeloPorProduto[produtoDb.id]);
-            }
-
-            produtosDoPedido.push({
-                id: produtoDb.id,
-                variacao_id: variacaoId,
-                quantidade: item.quantidade,
-                preco_base: precoBaseItem,
-                preco_atacado: produtoDb.preco_atacado
-                    ? Number(produtoDb.preco_atacado)
-                    : 0,
-                eh_gelo: produtoDb.eh_gelo_especial || produtoDb.eh_gelo_cubo // gelo nunca entra no atacado por valor
-            });
-        }
-
-        let novoValorTotalCalculado = 0;
-        const itensValidados = [];
-
-        // Atacado por valor do carrinho: quando o subtotal (a preço normal, sem
-        // taxa de entrega) chega a R$ 300,00, TODOS os itens que têm preço de
-        // atacado passam a valer esse preço. Não vale para gelo (que já tem sua
-        // própria tabela de faixas). Calculado aqui, nunca confiando no front-end.
-        const VALOR_MINIMO_ATACADO = 300;
-
-        const subtotalSemAtacado = produtosDoPedido.reduce(
-            (soma, prod) => soma + prod.preco_base * Number(prod.quantidade),
-            0
-        );
-
-        const carrinhoAtingiuAtacado =
-            subtotalSemAtacado >= VALOR_MINIMO_ATACADO;
-
-        for (let prod of produtosDoPedido) {
-            let precoFinalItem = prod.preco_base;
-
-            const aplicaAtacado =
-                !prod.eh_gelo &&
-                carrinhoAtingiuAtacado &&
-                prod.preco_atacado > 0;
-
-            if (aplicaAtacado) {
-                precoFinalItem = prod.preco_atacado;
-            }
-
-            itensValidados.push({
-                id: prod.id,
-                variacao_id: prod.variacao_id,
-                quantidade: prod.quantidade,
-                preco: precoFinalItem
-            });
-
-            novoValorTotalCalculado +=
-                precoFinalItem * prod.quantidade;
-        }
-
-        novoValorTotalCalculado += taxaEntrega;
-
-        const enderecoFinal =
-            tipoEntregaFinal === 'retirada' ? 'Retirada na loja' : endereco;
-
-        const [resultadoPedido] = await connection.execute(
-            'INSERT INTO pedidos (nome_cliente, telefone, endereco, valor_total, taxa_entrega, tipo_entrega, forma_pagamento, troco_para, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                nome_cliente,
-                telefone,
-                enderecoFinal,
-                novoValorTotalCalculado,
-                taxaEntrega,
-                tipoEntregaFinal,
-                formaPagamentoFinal,
-                trocoParaFinal,
-                'pendente'
-            ]
-        );
-
-        const pedidoId = resultadoPedido.insertId;
-
-        for (let item of itensValidados) {
-            await connection.execute(
-                'INSERT INTO itens_pedido (pedido_id, produto_id, variacao_id, quantidade, preco) VALUES (?, ?, ?, ?, ?)',
-                [
-                    pedidoId,
-                    item.id,
-                    item.variacao_id,
-                    item.quantidade,
-                    item.preco
-                ]
-            );
-        }
-
-        await connection.commit();
-
-        res.status(201).json({
-            sucesso: true,
-            mensagem: 'Pedido realizado com sucesso!',
-            chave_pix: 'masterdistribuidoracm@gmail.com'
-        });
-    } catch (erro) {
-        if (connection) {
-            try {
-                await connection.rollback();
-            } catch {}
-        }
-
-        console.error('Erro ao processar pedido:', erro);
-
-        res.status(400).json({
-            erro: erro.message || 'Erro ao processar o pedido.'
-        });
-    } finally {
-        if (connection) {
-            await connection.end();
-        }
-    }
-});
-
-app.put('/pedidos/:id/status', autenticarAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        await connection.beginTransaction();
-
-        const [pedidoRows] = await connection.execute(
-            'SELECT status FROM pedidos WHERE id = ?',
-            [id]
-        );
-
-        if (pedidoRows.length === 0) {
-            throw new Error('Pedido não encontrado.');
-        }
-
-        const statusAnterior = pedidoRows[0].status;
-
-        await connection.execute(
-            'UPDATE pedidos SET status = ? WHERE id = ?',
-            [status, id]
-        );
-
-        if (status === 'pago' && statusAnterior !== 'pago') {
-            const [itens] = await connection.execute(
-                'SELECT produto_id, variacao_id, quantidade FROM itens_pedido WHERE pedido_id = ?',
-                [id]
-            );
-
-            for (let item of itens) {
-                if (item.variacao_id) {
-                    await connection.execute(
-                        'UPDATE produto_variacoes SET estoque = estoque - ? WHERE id = ?',
-                        [item.quantidade, item.variacao_id]
-                    );
-                } else {
-                    await connection.execute(
-                        'UPDATE produtos SET estoque = estoque - ? WHERE id = ?',
-                        [item.quantidade, item.produto_id]
-                    );
-                }
-            }
-        } else if (
-            status === 'cancelado' &&
-            statusAnterior === 'pago'
-        ) {
-            const [itens] = await connection.execute(
-                'SELECT produto_id, variacao_id, quantidade FROM itens_pedido WHERE pedido_id = ?',
-                [id]
-            );
-
-            for (let item of itens) {
-                if (item.variacao_id) {
-                    await connection.execute(
-                        'UPDATE produto_variacoes SET estoque = estoque + ? WHERE id = ?',
-                        [item.quantidade, item.variacao_id]
-                    );
-                } else {
-                    await connection.execute(
-                        'UPDATE produtos SET estoque = estoque + ? WHERE id = ?',
-                        [item.quantidade, item.produto_id]
-                    );
-                }
-            }
-        }
-
-        await connection.commit();
-
-        res.json({
-            sucesso: true,
-            mensagem: 'Status atualizado com sucesso!'
-        });
-    } catch (erro) {
-        if (connection) {
-            try {
-                await connection.rollback();
-            } catch {}
-        }
-
-        console.error('Erro ao atualizar status:', erro);
-
-        res.status(500).json({
-            erro: erro.message || 'Erro ao atualizar o status.'
-        });
-    } finally {
-        if (connection) {
-            await connection.end();
-        }
-    }
-});
-
-app.delete('/pedidos/:id', autenticarAdmin, async (req, res) => {
-    const { id } = req.params;
-
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        await connection.execute(
-            'DELETE FROM pedidos WHERE id = ?',
-            [id]
-        );
-
-        res.json({
-            sucesso: true,
-            mensagem: 'Pedido excluído com sucesso!'
-        });
-    } catch (erro) {
-        console.error('Erro ao excluir pedido:', erro);
-
-        res.status(500).json({
-            erro: 'Erro ao excluir pedido.'
-        });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-app.get('/relatorio-semanal', autenticarAdmin, async (req, res) => {
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const query = `
-            SELECT
-                p.id AS pedido_id,
-                ip.quantidade,
-                ip.preco AS preco_venda,
-                COALESCE(v.preco_custo, pr.preco_custo) AS preco_custo
-            FROM pedidos p
-            JOIN itens_pedido ip ON p.id = ip.pedido_id
-            JOIN produtos pr ON ip.produto_id = pr.id
-            LEFT JOIN produto_variacoes v ON ip.variacao_id = v.id
-            WHERE p.status != 'cancelado'
-            AND YEARWEEK(p.data_criacao, 0) = YEARWEEK(CURDATE(), 0)
-        `;
-
-        const [rows] = await connection.execute(query);
-
-        let faturamentoTotal = 0;
-        let custoTotal = 0;
-        const pedidosSemana = new Set();
-
-        rows.forEach(row => {
-            pedidosSemana.add(row.pedido_id);
-
-            faturamentoTotal +=
-                Number(row.preco_venda) *
-                row.quantidade;
-
-            custoTotal +=
-                Number(row.preco_custo || 0) *
-                row.quantidade;
-        });
-
-        res.json({
-            total_pedidos: pedidosSemana.size,
-            faturamento: faturamentoTotal,
-            lucro: faturamentoTotal - custoTotal
-        });
-    } catch (erro) {
-        console.error('Erro ao gerar relatório:', erro);
-
-        res.status(500).json({
-            erro: 'Erro ao gerar relatório.'
-        });
-    } finally {
-        if (connection) await connection.end();
-    }
-});
-
-// Cria a coluna 'ordem' automaticamente (uma única vez) mantendo a ordem atual (por id)
-async function garantirColunaOrdem() {
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const [[{ existe }]] = await connection.execute(
-            `SELECT COUNT(*) AS existe FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produtos' AND COLUMN_NAME = 'ordem'`
-        );
-
-        if (!existe) {
-            await connection.execute('ALTER TABLE produtos ADD COLUMN ordem INT NOT NULL DEFAULT 0');
-            await connection.execute('UPDATE produtos SET ordem = id');
-            console.log('[migração] Coluna produtos.ordem criada.');
-        }
-    } catch (erro) {
-        console.error('[migração] Não foi possível garantir a coluna produtos.ordem:', erro.message);
-    } finally {
-        if (connection) await connection.end();
-    }
-}
-
-// Cria a coluna 'eh_gelo_cubo' automaticamente (uma única vez). Sem ela as listagens de produtos não funcionam,
-// então, se não for possível criá-la, o servidor avisa claramente e não inicia.
-async function garantirColunaGeloCubo() {
-    let connection;
-
-    try {
-        connection = await mysql.createConnection(dbConfig);
-
-        const [[{ existe }]] = await connection.execute(
-            `SELECT COUNT(*) AS existe FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produtos' AND COLUMN_NAME = 'eh_gelo_cubo'`
-        );
-
-        if (!existe) {
-            await connection.execute('ALTER TABLE produtos ADD COLUMN eh_gelo_cubo TINYINT(1) NOT NULL DEFAULT 0');
-            console.log('[migração] Coluna produtos.eh_gelo_cubo criada.');
-        }
-    } catch (erro) {
-        console.error('[migração] Não foi possível criar a coluna produtos.eh_gelo_cubo:', erro.message);
-        console.error('Crie manualmente no MySQL: ALTER TABLE produtos ADD COLUMN eh_gelo_cubo TINYINT(1) NOT NULL DEFAULT 0;');
-        process.exit(1);
-    } finally {
-        if (connection) await connection.end();
-    }
-}
-
-const PORTA = Number(process.env.PORT || 3000);
-
-garantirColunaOrdem().then(garantirColunaGeloCubo).finally(() => {
-    app.listen(PORTA, '0.0.0.0', () => {
-        console.log(`Servidor rodando na porta ${PORTA} 🚀`);
-    });
-});
+const hoje = require('../lib/util').hojeBR(); // mesma data (Brasília) que o servidor usa
+const venda = (itens, extra = {}) => ({ token_unico: crypto.randomUUID(), data_venda: hoje, forma_pagamento: 'Pix', desconto: 0, valor_pago: 0, itens, ...extra });
+const copao = (ingredientes, extra = {}) => ({ unidade: 'copao', descricao: 'Copão', quantidade: 1, preco_unitario: 25, ingredientes, ...extra });
+
+const combo = (combo_id, extra = {}) => ({ unidade: 'combo', combo_id, descricao: 'Combo', quantidade: 1, preco_unitario: 90, ...extra });
+const novoCombo = (extra = {}) => api('POST', '/api/combos', { nome: 'Combo Vodka + 5 gelos', preco: 90, itens: [{ produto_id: 1, quantidade: 1 }, { produto_id: 2, quantidade: 5 }], ...extra });
+const totalMl = id => S.produtos[id].quantidade * S.produtos[id].volume_ml + S.produtos[id].ml_avulso;
+let ok = 0, falhas = 0;
+const t = async (nome, fn) => { S = novoEstado(); snapshot = null; try { await fn(); ok++; console.log('  ✓', nome); } catch (e) { falhas++; console.log('  ✗', nome, '\n     ', e.message); } };
+
+(async () => {
+  console.log('Combos (rotas reais, banco simulado)');
+  await t('criar combo (1 vodka + 5 gelos) e listar com custo, lucro e quantidade vendável', async () => {
+    const r = await novoCombo(); assert.strictEqual(r.status, 201, JSON.stringify(r.b));
+    const l = await api('GET', '/api/combos'); assert.strictEqual(l.status, 200);
+    assert.strictEqual(l.b.length, 1); const c = l.b[0];
+    assert.strictEqual(c.nome, 'Combo Vodka + 5 gelos'); assert.strictEqual(c.preco, 90);
+    assert.strictEqual(c.custo, 85); assert.strictEqual(c.lucro, 5);
+    assert.strictEqual(c.maximo, 3, 'limitado pelas 3 garrafas de vodka (gelo daria 10)');
+    assert.deepStrictEqual(c.itens.map(i => [i.produto_id, i.quantidade, i.ml_unitario]), [[1, 1, null], [2, 5, null]]);
+    assert.ok(S.auditoria.some(a => a.acao === 'COMBO_CRIADO'));
+  });
+  await t('vender 2 combos baixa 2 vodkas e 10 gelos do estoque e grava custo, ingredientes e movimentações', async () => {
+    const id = (await novoCombo()).b.id;
+    const r = await api('POST', '/api/vendas', venda([combo(id, { quantidade: 2 })], { valor_pago: 180 }));
+    assert.strictEqual(r.status, 201, JSON.stringify(r.b));
+    assert.strictEqual(S.produtos[1].quantidade, 3 - 2); assert.strictEqual(S.produtos[2].quantidade, 50 - 10);
+    const it = S.itens[0];
+    assert.strictEqual(it.unidade, 'combo'); assert.strictEqual(it.produto_id, null); assert.strictEqual(it.quantidade, 2);
+    assert.strictEqual(it.preco_unitario, 90); assert.strictEqual(it.subtotal, 180); assert.strictEqual(it.custo_unitario, 85);
+    assert.strictEqual(it.descricao, 'Combo Vodka + 5 gelos (Vodka + 5× Gelo)');
+    assert.deepStrictEqual(S.ings.map(g => [g.produto_id, g.quantidade, g.ml_unitario, g.custo]), [[1, 1, null, 80], [2, 5, null, 5]]);
+    assert.deepStrictEqual(S.movs.filter(m => m.produto_id === 2).map(m => [m.tipo, m.quantidade, m.saldo_apos, m.venda_id]), [['saida', 10, 40, r.b.id]]);
+    assert.strictEqual(S.pags.length, 1);
+  });
+  await t('o navegador não manda no que baixa: ingredientes enviados na venda são ignorados', async () => {
+    const id = (await novoCombo()).b.id;
+    const r = await api('POST', '/api/vendas', venda([combo(id, { ingredientes: [{ produto_id: 4, quantidade: 2 }] })]));
+    assert.strictEqual(r.status, 201, JSON.stringify(r.b));
+    assert.strictEqual(S.produtos[4].quantidade, 2, 'whisky intacto'); assert.strictEqual(S.produtos[1].quantidade, 2); assert.strictEqual(S.produtos[2].quantidade, 45);
+  });
+  await t('combo com dose em ml (100 ml de vodka + 2 gelos + 1 energético)', async () => {
+    const id = (await novoCombo({ nome: 'Dose', itens: [{ produto_id: 1, quantidade: 1, ml_unitario: 100 }, { produto_id: 2, quantidade: 2 }, { produto_id: 3, quantidade: 1 }] })).b.id;
+    const r = await api('POST', '/api/vendas', venda([combo(id, { quantidade: 3, preco_unitario: 20 })]));
+    assert.strictEqual(r.status, 201, JSON.stringify(r.b));
+    assert.strictEqual(totalMl(1), 3000 - 300); assert.strictEqual(S.produtos[1].ml_avulso, 700); assert.strictEqual(S.produtos[2].quantidade, 44); assert.strictEqual(S.produtos[3].quantidade, 21);
+    assert.strictEqual(S.itens[0].custo_unitario, 8 + 2 + 6); assert.strictEqual(S.itens[0].descricao, 'Dose (Vodka 100 ml + 2× Gelo + Energético)');
+  });
+  await t('estoque insuficiente recusa a venda inteira e não deixa nada pela metade', async () => {
+    const id = (await novoCombo()).b.id; const antes = clone(S.produtos);
+    const r = await api('POST', '/api/vendas', venda([combo(id, { quantidade: 4 })]));
+    assert.strictEqual(r.status, 400); assert.ok(/Estoque insuficiente/.test(r.b.erro), r.b.erro);
+    assert.deepStrictEqual(S.produtos, antes); assert.strictEqual(Object.keys(S.vendas).length, 0); assert.strictEqual(S.itens.length, 0); assert.strictEqual(S.ings.length, 0);
+  });
+  await t('combo e item avulso do mesmo produto somam a demanda no estoque', async () => {
+    const id = (await novoCombo()).b.id;
+    const r = await api('POST', '/api/vendas', venda([combo(id, { quantidade: 2 }), { produto_id: 1, descricao: 'Vodka', unidade: 'garrafa', quantidade: 2, preco_unitario: 100 }]));
+    assert.strictEqual(r.status, 400, 'precisa de 4 vodkas e só há 3');
+    const r2 = await api('POST', '/api/vendas', venda([combo(id, { quantidade: 2 }), { produto_id: 1, descricao: 'Vodka', unidade: 'garrafa', quantidade: 1, preco_unitario: 100 }]));
+    assert.strictEqual(r2.status, 201, JSON.stringify(r2.b)); assert.strictEqual(S.produtos[1].quantidade, 0);
+  });
+  await t('cancelar devolve exatamente o mesmo estoque e não devolve duas vezes', async () => {
+    const id = (await novoCombo()).b.id;
+    const r = await api('POST', '/api/vendas', venda([combo(id, { quantidade: 3 })]));
+    assert.strictEqual(S.produtos[1].quantidade, 0); assert.strictEqual(S.produtos[2].quantidade, 35);
+    assert.strictEqual((await api('POST', `/api/vendas/${r.b.id}/cancelar`)).status, 200);
+    assert.strictEqual(S.produtos[1].quantidade, 3); assert.strictEqual(S.produtos[2].quantidade, 50);
+    assert.strictEqual((await api('POST', `/api/vendas/${r.b.id}/cancelar`)).status, 409); assert.strictEqual(S.produtos[1].quantidade, 3);
+  });
+  await t('excluir devolve o estoque; restaurar baixa de novo', async () => {
+    const id = (await novoCombo()).b.id;
+    const r = await api('POST', '/api/vendas', venda([combo(id, { quantidade: 2 })], { valor_pago: 20 }));
+    const apos = clone(S.produtos);
+    const ex = await api('POST', `/api/vendas/${r.b.id}/excluir`, { estado_esperado: { total_pago: 20, qtd_pagamentos: 1 }, confirmar_pagamentos: true });
+    assert.strictEqual(ex.status, 200, JSON.stringify(ex.b)); assert.strictEqual(S.produtos[1].quantidade, 3); assert.strictEqual(S.produtos[2].quantidade, 50);
+    assert.strictEqual((await api('POST', `/api/vendas/${r.b.id}/restaurar`)).status, 200); assert.deepStrictEqual(S.produtos, apos);
+  });
+  await t('editar o combo vale para as próximas vendas; a venda antiga devolve o que realmente baixou', async () => {
+    const id = (await novoCombo()).b.id;
+    const v1 = await api('POST', '/api/vendas', venda([combo(id)]));
+    assert.strictEqual(S.produtos[2].quantidade, 45);
+    const e = await api('PUT', `/api/combos/${id}`, { nome: 'Combo Vodka + 10 gelos', preco: 100, itens: [{ produto_id: 1, quantidade: 1 }, { produto_id: 2, quantidade: 10 }] });
+    assert.strictEqual(e.status, 200, JSON.stringify(e.b));
+    await api('POST', '/api/vendas', venda([combo(id, { preco_unitario: 100 })]));
+    assert.strictEqual(S.produtos[2].quantidade, 35); assert.strictEqual(S.itens[1].descricao, 'Combo Vodka + 10 gelos (Vodka + 10× Gelo)');
+    assert.strictEqual((await api('POST', `/api/vendas/${v1.b.id}/cancelar`)).status, 200);
+    assert.strictEqual(S.produtos[2].quantidade, 40, 'devolveu os 5 gelos da venda antiga, não 10');
+  });
+  await t('excluir o combo não afeta vendas já feitas (cancelar ainda devolve o estoque)', async () => {
+    const id = (await novoCombo()).b.id;
+    const v = await api('POST', '/api/vendas', venda([combo(id)]));
+    assert.strictEqual((await api('DELETE', `/api/combos/${id}`)).status, 200);
+    assert.strictEqual((await api('GET', '/api/combos')).b.length, 0);
+    assert.strictEqual((await api('POST', `/api/vendas/${v.b.id}/cancelar`)).status, 200);
+    assert.strictEqual(S.produtos[1].quantidade, 3); assert.strictEqual(S.produtos[2].quantidade, 50);
+    assert.strictEqual((await api('DELETE', `/api/combos/${id}`)).status, 404);
+    const r = await api('POST', '/api/vendas', venda([combo(id)])); assert.strictEqual(r.status, 400); assert.ok(/Combo não encontrado/.test(r.b.erro));
+  });
+  await t('validações do cadastro: nome, preço, itens, repetidos, ml sem volume, produto inativo/inexistente, nome duplicado', async () => {
+    assert.strictEqual((await novoCombo({ nome: '' })).status, 400);
+    assert.strictEqual((await novoCombo({ preco: '' })).status, 400);
+    assert.strictEqual((await novoCombo({ preco: -5 })).status, 400);
+    assert.strictEqual((await novoCombo({ itens: [] })).status, 400);
+    assert.strictEqual((await novoCombo({ itens: [{ produto_id: 2, quantidade: 0 }] })).status, 400);
+    assert.strictEqual((await novoCombo({ itens: [{ produto_id: 2, quantidade: 1 }, { produto_id: 2, quantidade: 2 }] })).status, 400);
+    assert.strictEqual((await novoCombo({ itens: [{ produto_id: 2, quantidade: 1, ml_unitario: 50 }] })).status, 400);
+    assert.strictEqual((await novoCombo({ itens: [{ produto_id: 99, quantidade: 1 }] })).status, 400);
+    S.produtos[4].ativo = 0; assert.strictEqual((await novoCombo({ itens: [{ produto_id: 4, quantidade: 1 }] })).status, 400); S.produtos[4].ativo = 1;
+    assert.strictEqual(S.combos.length, 0);
+    assert.strictEqual((await novoCombo()).status, 201); assert.strictEqual((await novoCombo()).status, 409);
+    assert.strictEqual((await api('PUT', '/api/combos/999', { nome: 'x', preco: 1, itens: [{ produto_id: 2, quantidade: 1 }] })).status, 404);
+  });
+  await t('venda com combo inexistente, sem combo_id ou com produto inativo é recusada sem baixar nada', async () => {
+    const id = (await novoCombo()).b.id; const antes = clone(S.produtos);
+    assert.strictEqual((await api('POST', '/api/vendas', venda([combo(9999)]))).status, 400);
+    assert.strictEqual((await api('POST', '/api/vendas', venda([combo(undefined)]))).status, 400);
+    S.produtos[2].ativo = 0;
+    const r = await api('POST', '/api/vendas', venda([combo(id)])); assert.strictEqual(r.status, 400); assert.ok(/Combo Vodka \+ 5 gelos/.test(r.b.erro) && /Gelo/.test(r.b.erro), r.b.erro);
+    S.produtos[2].ativo = 1;
+    assert.deepStrictEqual(S.produtos, antes); assert.strictEqual(Object.keys(S.vendas).length, 0);
+  });
+  await t('listagem avisa quando falta estoque ou o produto está inativo', async () => {
+    await novoCombo(); S.produtos[1].quantidade = 0;
+    assert.strictEqual((await api('GET', '/api/combos')).b[0].maximo, 0);
+    S.produtos[1].quantidade = 3; S.produtos[2].ativo = 0;
+    const c = (await api('GET', '/api/combos')).b[0]; assert.strictEqual(c.maximo, 0); assert.ok(/inativo/.test(c.problema));
+  });
+  await t('não deixa excluir produto que faz parte de combo; depois de excluir o combo, deixa', async () => {
+    const id = (await novoCombo()).b.id;
+    const r = await api('DELETE', '/api/produtos/2'); assert.strictEqual(r.status, 409); assert.ok(/Combo Vodka \+ 5 gelos/.test(r.b.erro)); assert.strictEqual(S.produtos[2].ativo, 1);
+    await api('DELETE', `/api/combos/${id}`);
+    assert.strictEqual((await api('DELETE', '/api/produtos/2')).status, 200); assert.strictEqual(S.produtos[2].ativo, 0);
+  });
+  await t('venda sem combo continua igual (garrafa e item manual)', async () => {
+    const r = await api('POST', '/api/vendas', venda([{ produto_id: 1, descricao: 'Vodka', unidade: 'garrafa', quantidade: 1, preco_unitario: 100 }, { descricao: 'Taxa', quantidade: 1, preco_unitario: 5 }]));
+    assert.strictEqual(r.status, 201, JSON.stringify(r.b)); assert.strictEqual(S.produtos[1].quantidade, 2); assert.strictEqual(S.itens.length, 2);
+  });
+
+  console.log(`\n${ok} aprovados, ${falhas} falha(s)`);
+  srv.close(); process.exit(falhas ? 1 : 0);
+})();
